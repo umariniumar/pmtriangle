@@ -77,21 +77,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Project Decision Simulator — Estimate duration & cost before you start" },
+      { title: "Simulator Keputusan Proyek — Perkirakan durasi & biaya sebelum mulai" },
       {
         name: "description",
         content:
-          "Simulate before you decide. Estimate a project's total hours, duration and cost in under three minutes, then get a clear go / no-go recommendation.",
+          "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan rekomendasi yang jelas.",
       },
-      { name: "author", content: "Project Decision Simulator" },
+      { name: "author", content: "Simulator Keputusan Proyek" },
       {
         property: "og:title",
-        content: "Project Decision Simulator — Simulate before you decide",
+        content: "Simulator Keputusan Proyek — Simulasikan sebelum memutuskan",
       },
       {
         property: "og:description",
         content:
-          "Estimate project duration and cost before starting. Add your tasks, hit simulate, get a recommendation.",
+          "Perkirakan durasi dan biaya proyek sebelum mulai. Tambahkan tugas Anda, klik simulasikan, dapatkan rekomendasi.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -120,10 +120,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const themeScript = `(function(){try{var k='pds-theme';var s=localStorage.getItem(k);var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <HeadContent />
       </head>
       <body>
