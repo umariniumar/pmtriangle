@@ -15,27 +15,42 @@ export interface SimulationResult {
   bufferHours: number;
 }
 
-// Assumptions used to translate effort into a realistic calendar estimate.
-// A freelancer rarely bills 8 focused hours a day — 6 is a healthier default.
+// Asumsi untuk menerjemahkan usaha (jam) menjadi estimasi kalender yang realistis.
+// Seorang freelancer jarang menagih 8 jam fokus per hari — 6 jam lebih sehat.
 export const FOCUS_HOURS_PER_DAY = 6;
 export const WORKING_DAYS_PER_WEEK = 5;
 
+// Kurs USD -> IDR (diperbarui 4 Juli 2026).
+export const USD_TO_IDR = 17982.27;
+
 export const CURRENCIES = [
+  { code: "IDR", symbol: "Rp" },
   { code: "USD", symbol: "$" },
-  { code: "EUR", symbol: "€" },
-  { code: "GBP", symbol: "£" },
 ] as const;
 
 export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
 
 export function currencySymbol(code: CurrencyCode): string {
-  return CURRENCIES.find((c) => c.code === code)?.symbol ?? "$";
+  return CURRENCIES.find((c) => c.code === code)?.symbol ?? "Rp";
+}
+
+// Konversi jumlah dari satu mata uang ke mata uang lain memakai kurs hari ini.
+export function convertAmount(
+  amount: number,
+  from: CurrencyCode,
+  to: CurrencyCode,
+): number {
+  if (from === to || !amount) return amount;
+  if (from === "USD" && to === "IDR") return amount * USD_TO_IDR;
+  if (from === "IDR" && to === "USD") return amount / USD_TO_IDR;
+  return amount;
 }
 
 export function formatMoney(amount: number, code: CurrencyCode): string {
-  return `${currencySymbol(code)}${amount.toLocaleString(undefined, {
-    maximumFractionDigits: 0,
-  })}`;
+  if (code === "IDR") {
+    return `Rp${Math.round(amount).toLocaleString("id-ID")}`;
+  }
+  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
 export function simulate(items: EstimateItem[]): SimulationResult {
@@ -48,16 +63,16 @@ export function simulate(items: EstimateItem[]): SimulationResult {
 
   let riskLevel: SimulationResult["riskLevel"] = "low";
   let recommendation =
-    "Low risk. This is a quick, well-contained job — you can commit with confidence and start soon.";
+    "Risiko rendah. Ini pekerjaan singkat dan terkendali — Anda bisa berkomitmen dengan percaya diri dan segera mulai.";
 
   if (weeks > 8) {
     riskLevel = "high";
     recommendation =
-      "High risk. This is a large engagement. Split it into phases with separate deliverables, and add a buffer before quoting a fixed price.";
+      "Risiko tinggi. Ini proyek besar. Pecah menjadi beberapa fase dengan deliverable terpisah, dan tambahkan buffer sebelum menawarkan harga tetap.";
   } else if (weeks >= 2) {
     riskLevel = "moderate";
     recommendation =
-      "Moderate scope. Break the work into weekly milestones and add a 15% time buffer to protect your timeline and margin.";
+      "Cakupan menengah. Bagi pekerjaan menjadi milestone mingguan dan tambahkan buffer waktu 15% untuk melindungi timeline serta margin Anda.";
   }
 
   return {
