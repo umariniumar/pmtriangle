@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -14,15 +15,18 @@ function Landing() {
             <Sparkles className="h-4 w-4" />
           </span>
           <span className="font-display text-base font-semibold tracking-tight">
-            Decision Simulator
+            Simulator Keputusan
           </span>
         </Link>
-        <Link
-          to="/simulate"
-          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5"
-        >
-          Start
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            to="/simulate"
+            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5"
+          >
+            Mulai
+          </Link>
+        </div>
       </header>
 
       <main>
@@ -31,18 +35,18 @@ function Landing() {
           <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-14 text-center sm:pt-20">
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              Simulate before you decide
+              Simulasikan sebelum memutuskan
             </span>
 
             <h1 className="mt-6 text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-              Know the cost and duration{" "}
-              <span className="text-primary">before</span> you start.
+              Ketahui biaya dan durasi{" "}
+              <span className="text-primary">sebelum</span> Anda mulai.
             </h1>
 
             <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg">
-              Add your tasks, hit simulate, and get an honest estimate of total
-              hours, timeline and cost — plus a clear recommendation. Under three
-              minutes, no sign-up.
+              Tambahkan tugas Anda, klik simulasikan, dan dapatkan estimasi jujur
+              tentang total jam, timeline, dan biaya — lengkap dengan rekomendasi.
+              Kurang dari tiga menit, tanpa daftar akun.
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -50,11 +54,11 @@ function Landing() {
                 to="/simulate"
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:w-auto"
               >
-                Run a simulation
+                Jalankan simulasi
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <span className="text-xs text-muted-foreground">
-                Free · No account needed
+                Gratis · Tanpa akun
               </span>
             </div>
           </div>
@@ -64,18 +68,18 @@ function Landing() {
           <div className="grid gap-4 sm:grid-cols-3">
             <FeatureCard
               icon={<Clock className="h-5 w-5" />}
-              title="Realistic duration"
-              body="Effort is translated into working days using focused-hour assumptions, not fantasy 8-hour sprints."
+              title="Durasi realistis"
+              body="Usaha diterjemahkan menjadi hari kerja memakai asumsi jam fokus, bukan sprint 8 jam yang tidak realistis."
             />
             <FeatureCard
               icon={<Wallet className="h-5 w-5" />}
-              title="Honest cost"
-              body="Combine hours and your rate to see exactly what the project is worth before you quote."
+              title="Biaya jujur"
+              body="Gabungkan jam dan tarif Anda untuk melihat nilai proyek yang sebenarnya sebelum menawarkan harga."
             />
             <FeatureCard
               icon={<Sparkles className="h-5 w-5" />}
-              title="Clear recommendation"
-              body="Get a go / plan / phase verdict based on scope and risk, so the decision is obvious."
+              title="Rekomendasi jelas"
+              body="Dapatkan putusan lanjut / rencanakan / pecah berdasarkan cakupan dan risiko, agar keputusan jadi mudah."
             />
           </div>
         </section>
@@ -83,7 +87,7 @@ function Landing() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">
-          Project Decision Simulator — clarity over complexity.
+          Simulator Keputusan Proyek — kejelasan di atas kerumitan.
         </div>
       </footer>
     </div>
