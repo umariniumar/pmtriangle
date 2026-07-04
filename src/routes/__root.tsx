@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Simulator Keputusan Proyek — Perkirakan durasi & biaya sebelum mulai" },
+      { title: "Project Management Triangle" },
       {
         name: "description",
         content:
@@ -95,6 +95,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Project Management Triangle" },
+      { name: "twitter:title", content: "Project Management Triangle" },
+      { name: "description", content: "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan rekomendasi yang jelas." },
+      { property: "og:description", content: "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan rekomendasi yang jelas." },
+      { name: "twitter:description", content: "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan rekomendasi yang jelas." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6867379b-2811-4393-bed5-786d5127d520/id-preview-2e5ebe56--54433566-41a1-4486-bd1c-ec3f4834ba39.lovable.app-1783189922838.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6867379b-2811-4393-bed5-786d5127d520/id-preview-2e5ebe56--54433566-41a1-4486-bd1c-ec3f4834ba39.lovable.app-1783189922838.png" },
     ],
     links: [
       {
