@@ -8,17 +8,19 @@ export interface EstimateItem {
 export interface SimulationResult {
   totalHours: number;
   totalCost: number;
+  averageRate: number;
   workingDays: number;
-  weeks: number;
+  durationLabel: string;
   riskLevel: "low" | "moderate" | "high";
-  recommendation: string;
+  insight: string;
   bufferHours: number;
+  idealHours: number;
 }
 
-// Asumsi untuk menerjemahkan usaha (jam) menjadi estimasi kalender yang realistis.
-// Seorang freelancer jarang menagih 8 jam fokus per hari — 6 jam lebih sehat.
-export const FOCUS_HOURS_PER_DAY = 6;
-export const WORKING_DAYS_PER_WEEK = 5;
+// Asumsi kalender: 8 jam kerja per hari, 5 hari kerja per minggu.
+// Manusia berpikir dalam hari, bukan pecahan minggu.
+export const WORK_HOURS_PER_DAY = 8;
+export const WORK_DAYS_PER_WEEK = 5;
 
 // MVP ini hanya memvalidasi pasar Indonesia, jadi mata uang tunggal: Rupiah.
 export function formatMoney(amount: number): string {
@@ -29,35 +31,71 @@ export function itemCost(item: EstimateItem): number {
   return (item.hours || 0) * (item.rate || 0);
 }
 
+// Menerjemahkan total jam menjadi satuan waktu yang natural (jam / hari / minggu).
+export function formatDuration(hours: number): string {
+  if (!hours || hours <= 0) return "—";
+
+  const fullDays = Math.floor(hours / WORK_HOURS_PER_DAY);
+  const remHours = Math.round(hours % WORK_HOURS_PER_DAY);
+
+  if (fullDays === 0) return `${remHours} Jam`;
+
+  const weeks = Math.floor(fullDays / WORK_DAYS_PER_WEEK);
+  const days = fullDays % WORK_DAYS_PER_WEEK;
+
+  const parts: string[] = [];
+  if (weeks > 0) parts.push(`${weeks} Minggu`);
+  if (days > 0) parts.push(`${days} Hari`);
+  if (remHours > 0) parts.push(`${remHours} Jam`);
+
+  return parts.join(" ");
+}
+
+function buildInsight(
+  totalHours: number,
+  riskLevel: SimulationResult["riskLevel"],
+): string {
+  if (totalHours <= 0) {
+    return "Tambahkan minimal satu pekerjaan dengan estimasi jam untuk melihat insight proyek Anda.";
+  }
+
+  const durText = formatDuration(totalHours).toLowerCase();
+  const base = `Proyek ini diperkirakan membutuhkan sekitar ${durText} kerja.`;
+
+  if (riskLevel === "low") {
+    return `${base} Beban kerja masih cukup aman untuk dikerjakan satu orang, dan estimasi biayanya realistis untuk freelancer.`;
+  }
+  if (riskLevel === "moderate") {
+    return `${base} Cakupannya menengah — bagi pekerjaan menjadi milestone mingguan dan sisihkan buffer waktu agar timeline tetap terjaga.`;
+  }
+  return `${base} Ini proyek besar. Pertimbangkan membagi pekerjaan menjadi dua atau lebih fase, terutama apabila deadline ketat.`;
+}
+
 export function simulate(items: EstimateItem[]): SimulationResult {
   const totalHours = items.reduce((sum, i) => sum + (i.hours || 0), 0);
   const totalCost = items.reduce((sum, i) => sum + itemCost(i), 0);
+  const averageRate = totalHours > 0 ? totalCost / totalHours : 0;
 
-  const workingDays = totalHours > 0 ? Math.ceil(totalHours / FOCUS_HOURS_PER_DAY) : 0;
-  const weeks = Math.round((workingDays / WORKING_DAYS_PER_WEEK) * 10) / 10;
+  const workingDays = totalHours > 0 ? Math.ceil(totalHours / WORK_HOURS_PER_DAY) : 0;
   const bufferHours = Math.round(totalHours * 0.15);
+  const idealHours = totalHours + bufferHours;
 
   let riskLevel: SimulationResult["riskLevel"] = "low";
-  let recommendation =
-    "Risiko rendah. Ini pekerjaan singkat dan terkendali — Anda bisa berkomitmen dengan percaya diri dan segera mulai.";
-
-  if (weeks > 8) {
+  if (workingDays > 40) {
     riskLevel = "high";
-    recommendation =
-      "Risiko tinggi. Ini proyek besar. Pecah menjadi beberapa fase dengan deliverable terpisah, dan tambahkan buffer sebelum menawarkan harga tetap.";
-  } else if (weeks >= 2) {
+  } else if (workingDays >= 10) {
     riskLevel = "moderate";
-    recommendation =
-      "Cakupan menengah. Bagi pekerjaan menjadi milestone mingguan dan tambahkan buffer waktu 15% untuk melindungi timeline serta margin Anda.";
   }
 
   return {
     totalHours,
     totalCost,
+    averageRate,
     workingDays,
-    weeks,
+    durationLabel: formatDuration(totalHours),
     riskLevel,
-    recommendation,
+    insight: buildInsight(totalHours, riskLevel),
     bufferHours,
+    idealHours,
   };
 }
