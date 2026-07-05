@@ -1,3 +1,5 @@
+import { buildProjectSummary, type ProjectSummary } from "@/lib/project-summary";
+
 export interface EstimateItem {
   id: string;
   name: string;
@@ -12,7 +14,7 @@ export interface SimulationResult {
   workingDays: number;
   durationLabel: string;
   riskLevel: "low" | "moderate" | "high";
-  insight: string;
+  projectSummary: ProjectSummary;
   bufferHours: number;
   idealHours: number;
 }
@@ -58,26 +60,6 @@ export function formatDuration(hours: number): string {
   return parts.join(" ");
 }
 
-function buildInsight(
-  totalHours: number,
-  riskLevel: SimulationResult["riskLevel"],
-): string {
-  if (totalHours <= 0) {
-    return "Tambahkan minimal satu pekerjaan dengan estimasi jam untuk melihat insight proyek Anda.";
-  }
-
-  const durText = formatDuration(totalHours).toLowerCase();
-  const base = `Proyek ini diperkirakan membutuhkan sekitar ${durText} kerja.`;
-
-  if (riskLevel === "low") {
-    return `${base} Beban kerja masih cukup aman untuk dikerjakan satu orang, dan estimasi biayanya realistis untuk freelancer.`;
-  }
-  if (riskLevel === "moderate") {
-    return `${base} Cakupannya menengah — bagi pekerjaan menjadi milestone mingguan dan sisihkan buffer waktu agar timeline tetap terjaga.`;
-  }
-  return `${base} Ini proyek besar. Pertimbangkan membagi pekerjaan menjadi dua atau lebih fase, terutama apabila deadline ketat.`;
-}
-
 export function simulate(items: EstimateItem[]): SimulationResult {
   const totalHours = items.reduce((sum, i) => sum + (i.hours || 0), 0);
   const totalCost = items.reduce((sum, i) => sum + itemCost(i), 0);
@@ -101,7 +83,12 @@ export function simulate(items: EstimateItem[]): SimulationResult {
     workingDays,
     durationLabel: formatDuration(totalHours),
     riskLevel,
-    insight: buildInsight(totalHours, riskLevel),
+    projectSummary: buildProjectSummary({
+      totalHours,
+      workingDays,
+      totalCost,
+      bufferHours,
+    }),
     bufferHours,
     idealHours,
   };

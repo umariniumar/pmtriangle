@@ -19,10 +19,10 @@ import {
   formatMoney,
   itemCost,
   simulate,
-  WORK_HOURS_PER_DAY,
 } from "@/lib/simulator";
 import { track } from "@/lib/analytics";
 import { AnimatedNumber } from "@/components/animated-number";
+import { ProjectSummaryCard } from "@/components/project-summary-card";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/simulate")({
@@ -435,25 +435,13 @@ function Results({
   projectName: string;
   result: ReturnType<typeof simulate>;
 }) {
-  const riskStyles: Record<typeof result.riskLevel, { label: string; cls: string }> = {
-    low: { label: "Risiko rendah", cls: "bg-success/12 text-success" },
-    moderate: { label: "Risiko menengah", cls: "bg-warning/15 text-warning-foreground" },
-    high: { label: "Risiko tinggi", cls: "bg-destructive/12 text-destructive" },
-  };
-  const risk = riskStyles[result.riskLevel];
-
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Estimasi untuk
-          </p>
-          <h2 className="truncate text-xl font-bold">{projectName}</h2>
-        </div>
-        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${risk.cls}`}>
-          {risk.label}
-        </span>
+      <div className="mb-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Estimasi untuk
+        </p>
+        <h2 className="truncate text-xl font-bold">{projectName}</h2>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -478,20 +466,7 @@ function Results({
         />
       </div>
 
-      <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
-        <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <h3 className="text-sm font-semibold">Insight</h3>
-        </div>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-foreground">
-          {result.insight}
-        </p>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Berdasarkan {WORK_HOURS_PER_DAY} jam kerja/hari selama 5 hari kerja seminggu.
-        </p>
-      </div>
+      <ProjectSummaryCard summary={result.projectSummary} />
     </div>
   );
 }
