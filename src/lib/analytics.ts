@@ -15,6 +15,8 @@ export type AnalyticsEvent =
   | "result_shared"
   | "feedback_clicked";
 
+export type ShareChannel = "copy" | "native" | "whatsapp";
+
 export type AnalyticsProps = Record<string, string | number | boolean | undefined>;
 
 export function track(event: AnalyticsEvent, props: AnalyticsProps = {}): void {

@@ -1,4 +1,4 @@
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Copy } from "lucide-react";
 import type { ProjectSummary } from "@/lib/project-summary";
 
 type SummaryRow = {
@@ -6,7 +6,13 @@ type SummaryRow = {
   value: React.ReactNode;
 };
 
-export function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
+export function ProjectSummaryCard({
+  summary,
+  onCopySummary,
+}: {
+  summary: ProjectSummary;
+  onCopySummary?: () => void;
+}) {
   const rows: SummaryRow[] = [
     {
       label: "Skala Proyek",
@@ -25,11 +31,23 @@ export function ProjectSummaryCard({ summary }: { summary: ProjectSummary }) {
 
   return (
     <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
-      <div className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <ClipboardList className="h-4 w-4" />
-        </span>
-        <h3 className="text-sm font-semibold">Ringkasan Proyek</h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <ClipboardList className="h-4 w-4" />
+          </span>
+          <h3 className="text-sm font-semibold">Ringkasan Proyek</h3>
+        </div>
+        {onCopySummary && (
+          <button
+            type="button"
+            onClick={onCopySummary}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Salin
+          </button>
+        )}
       </div>
 
       <dl className="mt-4 space-y-3">

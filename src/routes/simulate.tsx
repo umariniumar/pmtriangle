@@ -12,8 +12,9 @@ import {
   RotateCcw,
   ClipboardList,
   Share2,
-  Check,
+  Copy,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   type EstimateItem,
   formatMoney,
@@ -21,6 +22,13 @@ import {
   simulate,
 } from "@/lib/simulator";
 import { track } from "@/lib/analytics";
+import { formatBrandedShareText, formatClientShareText } from "@/lib/share-text";
+import {
+  canUseNativeShare,
+  copyToClipboard,
+  nativeShare,
+  openWhatsAppShare,
+} from "@/lib/share";
 import { AnimatedNumber } from "@/components/animated-number";
 import { ProjectSummaryCard } from "@/components/project-summary-card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -58,7 +66,6 @@ function SimulatePage() {
   const [projectName, setProjectName] = useState("");
   const [items, setItems] = useState<EstimateItem[]>([makeItem()]);
   const [showResult, setShowResult] = useState(false);
-  const [shared, setShared] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const projectCreatedRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -117,24 +124,43 @@ function SimulatePage() {
     );
   };
 
-  const handleShare = async () => {
-    track("result_shared");
-    const summary = `Estimasi "${projectName}" — ${result.durationLabel} · ${formatMoney(
-      result.totalCost,
-    )} (${result.totalHours} jam). Dibuat dengan ESTIMO.`;
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `Estimasi ${projectName}`, text: summary });
-        return;
-      }
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(summary);
-        setShared(true);
-        setTimeout(() => setShared(false), 2000);
-      }
-    } catch {
-      /* pengguna membatalkan — abaikan */
+  const shareInput = useMemo(
+    () => ({
+      projectName,
+      durationLabel: result.durationLabel,
+      totalCost: result.totalCost,
+      scaleLabel: result.projectSummary.scaleLabel,
+      recommendation: result.projectSummary.recommendation,
+    }),
+    [projectName, result],
+  );
+
+  const handleCopySummary = async () => {
+    const copied = await copyToClipboard(formatClientShareText(shareInput));
+    if (copied) {
+      track("result_shared", { channel: "copy" });
+      toast.success("Ringkasan disalin");
+      return;
     }
+    toast.error("Gagal menyalin ringkasan");
+  };
+
+  const handleShareResult = async () => {
+    const text = formatBrandedShareText(shareInput);
+    const title = `Estimasi ${projectName.trim() || "Proyek"}`;
+
+    if (canUseNativeShare()) {
+      const outcome = await nativeShare(title, text);
+      if (outcome === "shared") {
+        track("result_shared", { channel: "native" });
+        toast.success("Estimasi dibagikan");
+      }
+      return;
+    }
+
+    openWhatsAppShare(text);
+    track("result_shared", { channel: "whatsapp" });
+    toast.success("Membuka WhatsApp");
   };
 
   const recalculate = () => {
@@ -345,7 +371,11 @@ function SimulatePage() {
             ref={resultRef}
             className="mt-10 scroll-mt-40 animate-in fade-in slide-in-from-bottom-4 duration-500"
           >
-            <Results projectName={projectName} result={result} />
+            <Results
+              projectName={projectName}
+              result={result}
+              onCopySummary={handleCopySummary}
+            />
           </div>
         )}
       </main>
@@ -354,29 +384,29 @@ function SimulatePage() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-5 py-3">
           {showResult ? (
-            <div className="flex gap-2">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={recalculate}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-input bg-background px-5 py-4 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Hitung Ulang
+                </button>
+                <button
+                  onClick={handleCopySummary}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5"
+                >
+                  <Copy className="h-4.5 w-4.5" />
+                  Salin Ringkasan
+                </button>
+              </div>
               <button
-                onClick={recalculate}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-input bg-background px-5 py-4 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+                onClick={handleShareResult}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-input bg-background px-6 py-3.5 text-base font-semibold text-foreground transition-colors hover:bg-accent"
               >
-                <RotateCcw className="h-4 w-4" />
-                Hitung Ulang
-              </button>
-              <button
-                onClick={handleShare}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5"
-              >
-                {shared ? (
-                  <>
-                    <Check className="h-4.5 w-4.5" />
-                    Tersalin
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="h-4.5 w-4.5" />
-                    Bagikan Hasil
-                  </>
-                )}
+                <Share2 className="h-4.5 w-4.5" />
+                Bagikan Hasil
               </button>
             </div>
           ) : (
@@ -431,9 +461,11 @@ function SummaryStat({
 function Results({
   projectName,
   result,
+  onCopySummary,
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
+  onCopySummary: () => void;
 }) {
   return (
     <div>
@@ -466,7 +498,7 @@ function Results({
         />
       </div>
 
-      <ProjectSummaryCard summary={result.projectSummary} />
+      <ProjectSummaryCard summary={result.projectSummary} onCopySummary={onCopySummary} />
     </div>
   );
 }
