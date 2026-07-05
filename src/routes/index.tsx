@@ -9,6 +9,10 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  useEffect(() => {
+    track("landing_view");
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
@@ -16,14 +20,15 @@ function Landing() {
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground shadow-soft">
             <Sparkles className="h-4 w-4" />
           </span>
-          <span className="font-display text-base font-semibold tracking-tight">
-            Simulator Keputusan
+          <span className="font-display text-base font-bold tracking-tight">
+            ESTIMO
           </span>
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Link
             to="/simulate"
+            onClick={() => track("start_estimation", { source: "header" })}
             className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5"
           >
             Mulai
