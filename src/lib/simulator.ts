@@ -20,42 +20,18 @@ export interface SimulationResult {
 export const FOCUS_HOURS_PER_DAY = 6;
 export const WORKING_DAYS_PER_WEEK = 5;
 
-// Kurs USD -> IDR (diperbarui 4 Juli 2026).
-export const USD_TO_IDR = 17982.27;
-
-export const CURRENCIES = [
-  { code: "IDR", symbol: "Rp" },
-  { code: "USD", symbol: "$" },
-] as const;
-
-export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
-
-export function currencySymbol(code: CurrencyCode): string {
-  return CURRENCIES.find((c) => c.code === code)?.symbol ?? "Rp";
+// MVP ini hanya memvalidasi pasar Indonesia, jadi mata uang tunggal: Rupiah.
+export function formatMoney(amount: number): string {
+  return `Rp${Math.round(amount).toLocaleString("id-ID")}`;
 }
 
-// Konversi jumlah dari satu mata uang ke mata uang lain memakai kurs hari ini.
-export function convertAmount(
-  amount: number,
-  from: CurrencyCode,
-  to: CurrencyCode,
-): number {
-  if (from === to || !amount) return amount;
-  if (from === "USD" && to === "IDR") return amount * USD_TO_IDR;
-  if (from === "IDR" && to === "USD") return amount / USD_TO_IDR;
-  return amount;
-}
-
-export function formatMoney(amount: number, code: CurrencyCode): string {
-  if (code === "IDR") {
-    return `Rp${Math.round(amount).toLocaleString("id-ID")}`;
-  }
-  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+export function itemCost(item: EstimateItem): number {
+  return (item.hours || 0) * (item.rate || 0);
 }
 
 export function simulate(items: EstimateItem[]): SimulationResult {
   const totalHours = items.reduce((sum, i) => sum + (i.hours || 0), 0);
-  const totalCost = items.reduce((sum, i) => sum + (i.hours || 0) * (i.rate || 0), 0);
+  const totalCost = items.reduce((sum, i) => sum + itemCost(i), 0);
 
   const workingDays = totalHours > 0 ? Math.ceil(totalHours / FOCUS_HOURS_PER_DAY) : 0;
   const weeks = Math.round((workingDays / WORKING_DAYS_PER_WEEK) * 10) / 10;
