@@ -33,21 +33,28 @@ export function itemCost(item: EstimateItem): number {
 
 // Menerjemahkan total jam menjadi satuan waktu yang natural (jam / hari / minggu).
 export function formatDuration(hours: number): string {
-  if (!hours || hours <= 0) return "—";
+  if (hours <= 0) {
+    if (hours === 0) return "0 Jam";
+    return "—";
+  }
+
+  const hoursPerWeek = WORK_HOURS_PER_DAY * WORK_DAYS_PER_WEEK;
+
+  if (hours < WORK_HOURS_PER_DAY) {
+    return `${Math.round(hours)} Jam`;
+  }
+
+  if (hours < hoursPerWeek) {
+    return `${Math.ceil(hours / WORK_HOURS_PER_DAY)} Hari`;
+  }
 
   const fullDays = Math.floor(hours / WORK_HOURS_PER_DAY);
-  const remHours = Math.round(hours % WORK_HOURS_PER_DAY);
-
-  if (fullDays === 0) return `${remHours} Jam`;
-
   const weeks = Math.floor(fullDays / WORK_DAYS_PER_WEEK);
   const days = fullDays % WORK_DAYS_PER_WEEK;
 
   const parts: string[] = [];
   if (weeks > 0) parts.push(`${weeks} Minggu`);
   if (days > 0) parts.push(`${days} Hari`);
-  if (remHours > 0) parts.push(`${remHours} Jam`);
-
   return parts.join(" ");
 }
 
