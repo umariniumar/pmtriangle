@@ -95,7 +95,7 @@ function Landing() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">
-          Simulator Keputusan Proyek — kejelasan di atas kerumitan.
+          ESTIMO — kejelasan di atas kerumitan.
         </div>
       </footer>
     </div>
