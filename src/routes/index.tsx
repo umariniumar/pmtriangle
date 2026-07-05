@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   component: Landing,
