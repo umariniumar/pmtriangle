@@ -1,3 +1,4 @@
+import { getAppUrl } from "@/lib/app-url";
 import { formatMoney } from "@/lib/simulator";
 
 export type ShareTextInput = {
@@ -8,34 +9,59 @@ export type ShareTextInput = {
   recommendation: string;
 };
 
-function buildSummaryBody(input: ShareTextInput): string {
-  const name = input.projectName.trim() || "Proyek";
+const DIVIDER = "────────────────────────";
+
+export function formatShareTimestamp(date = new Date()): string {
+  const day = date.getDate();
+  const month = date.toLocaleDateString("id-ID", { month: "long" });
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${day} ${month} ${year} • ${hours}:${minutes} WIB`;
+}
+
+function buildDocumentBody(input: ShareTextInput): string {
+  const title = input.projectName.trim() || "Proyek";
 
   return [
-    name,
+    title,
     "",
-    "Ringkasan Proyek",
+    "Estimasi Proyek",
+    "",
+    DIVIDER,
     "",
     "Skala Proyek",
     input.scaleLabel,
     "",
-    "Estimasi",
+    "Estimasi Durasi",
     input.durationLabel,
     "",
-    "Biaya",
+    "Estimasi Biaya",
     formatMoney(input.totalCost),
     "",
     "Rekomendasi",
     input.recommendation,
+    "",
+    DIVIDER,
   ].join("\n");
 }
 
-/** Tanpa branding — untuk dikirim ke klien. */
+/** Versi klien — tanpa branding, URL, atau timestamp. */
 export function formatClientShareText(input: ShareTextInput): string {
-  return buildSummaryBody(input);
+  return buildDocumentBody(input);
 }
 
-/** Dengan branding ESTIMO — untuk fitur Bagikan Hasil. */
-export function formatBrandedShareText(input: ShareTextInput): string {
-  return ["ESTIMO", "", buildSummaryBody(input), "", "Dibuat menggunakan ESTIMO"].join("\n");
+/** Versi branded — untuk fitur Bagikan. */
+export function formatBrandedShareText(input: ShareTextInput, generatedAt = new Date()): string {
+  const appUrl = getAppUrl();
+  const footerLines = [
+    "",
+    "Disimulasikan menggunakan ESTIMO",
+    "",
+    ...(appUrl ? [appUrl, ""] : []),
+    formatShareTimestamp(generatedAt),
+  ];
+
+  return buildDocumentBody(input) + footerLines.join("\n");
 }

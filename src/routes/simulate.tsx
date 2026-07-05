@@ -139,28 +139,28 @@ function SimulatePage() {
     const copied = await copyToClipboard(formatClientShareText(shareInput));
     if (copied) {
       track("result_shared", { channel: "copy" });
-      toast.success("Ringkasan disalin");
+      toast.success("Ringkasan berhasil disalin.");
       return;
     }
-    toast.error("Gagal menyalin ringkasan");
+    toast.error("Gagal menyalin ringkasan. Coba lagi.");
   };
 
   const handleShareResult = async () => {
     const text = formatBrandedShareText(shareInput);
-    const title = `Estimasi ${projectName.trim() || "Proyek"}`;
+    const title = projectName.trim() || "Proyek";
 
     if (canUseNativeShare()) {
       const outcome = await nativeShare(title, text);
       if (outcome === "shared") {
         track("result_shared", { channel: "native" });
-        toast.success("Estimasi dibagikan");
+        toast.success("Estimasi berhasil dibagikan.");
       }
       return;
     }
 
     openWhatsAppShare(text);
     track("result_shared", { channel: "whatsapp" });
-    toast.success("Membuka WhatsApp");
+    toast.success("Membuka WhatsApp...");
   };
 
   const recalculate = () => {
@@ -384,29 +384,29 @@ function SimulatePage() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-5 py-3">
           {showResult ? (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={recalculate}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-input bg-background px-5 py-4 text-base font-semibold text-foreground transition-colors hover:bg-accent"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Hitung Ulang
-                </button>
-                <button
-                  onClick={handleCopySummary}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5"
-                >
-                  <Copy className="h-4.5 w-4.5" />
-                  Salin Ringkasan
-                </button>
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={recalculate}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
+              >
+                <RotateCcw className="h-4 w-4 shrink-0" />
+                <span className="leading-none sm:hidden">Ulang</span>
+                <span className="hidden leading-none sm:inline">Hitung Ulang</span>
+              </button>
+              <button
+                onClick={handleCopySummary}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl bg-primary px-2 py-3 text-xs font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
+              >
+                <Copy className="h-4 w-4 shrink-0" />
+                <span className="leading-none sm:hidden">Salin</span>
+                <span className="hidden leading-none sm:inline">Salin Ringkasan</span>
+              </button>
               <button
                 onClick={handleShareResult}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-input bg-background px-6 py-3.5 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
               >
-                <Share2 className="h-4.5 w-4.5" />
-                Bagikan Hasil
+                <Share2 className="h-4 w-4 shrink-0" />
+                <span className="leading-none">Bagikan</span>
               </button>
             </div>
           ) : (
