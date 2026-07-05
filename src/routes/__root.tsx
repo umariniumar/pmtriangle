@@ -84,6 +84,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan insight yang jelas.",
       },
       { name: "author", content: "ESTIMO" },
+      { name: "application-name", content: "ESTIMO" },
+      { property: "og:site_name", content: "ESTIMO" },
       {
         property: "og:title",
         content: "ESTIMO — Simulasikan sebelum memutuskan",
@@ -109,7 +111,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "preconnect",
@@ -128,7 +130,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-const themeScript = `(function(){try{var k='pds-theme';var s=localStorage.getItem(k);var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+const themeScript = `(function(){try{var k='estimo-theme';var o='pds-theme';var s=localStorage.getItem(k);if(!s){s=localStorage.getItem(o);if(s)localStorage.setItem(k,s);}var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
