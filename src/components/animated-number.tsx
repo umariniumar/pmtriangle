@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 export function useCountUp(value: number, durationMs = 450): number {
   const [display, setDisplay] = useState(value);
   const fromRef = useRef(value);
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const from = fromRef.current;
