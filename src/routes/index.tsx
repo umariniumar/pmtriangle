@@ -1,12 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { track } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   component: Landing,
 });
 
 function Landing() {
+  useEffect(() => {
+    track("landing_view");
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
@@ -14,14 +20,15 @@ function Landing() {
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground shadow-soft">
             <Sparkles className="h-4 w-4" />
           </span>
-          <span className="font-display text-base font-semibold tracking-tight">
-            Simulator Keputusan
+          <span className="font-display text-base font-bold tracking-tight">
+            ESTIMO
           </span>
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Link
             to="/simulate"
+            onClick={() => track("start_estimation", { source: "header" })}
             className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5"
           >
             Mulai
@@ -52,9 +59,10 @@ function Landing() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/simulate"
+                onClick={() => track("start_estimation", { source: "hero" })}
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:w-auto"
               >
-                Jalankan simulasi
+                Mulai Estimasi
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <span className="text-xs text-muted-foreground">
@@ -87,7 +95,7 @@ function Landing() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">
-          Simulator Keputusan Proyek — kejelasan di atas kerumitan.
+          ESTIMO — kejelasan di atas kerumitan.
         </div>
       </footer>
     </div>
