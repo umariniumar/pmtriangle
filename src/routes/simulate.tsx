@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Plus,
@@ -11,20 +11,25 @@ import {
   ListChecks,
   RotateCcw,
   ClipboardList,
+  Share2,
+  Check,
 } from "lucide-react";
 import {
   type EstimateItem,
   formatMoney,
+  formatDuration,
   itemCost,
   simulate,
-  FOCUS_HOURS_PER_DAY,
+  WORK_HOURS_PER_DAY,
 } from "@/lib/simulator";
+import { track } from "@/lib/analytics";
+import { AnimatedNumber } from "@/components/animated-number";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/simulate")({
   head: () => ({
     meta: [
-      { title: "Simulasikan proyek — Simulator Keputusan Proyek" },
+      { title: "Estimasi proyek — ESTIMO" },
       {
         name: "description",
         content:
@@ -43,26 +48,55 @@ const makeItem = (): EstimateItem => ({
   rate: 0,
 });
 
+const PLACEHOLDER_EXAMPLES = [
+  "Website Company Profile",
+  "Landing Page",
+  "Aplikasi POS",
+  "Logo Brand",
+];
+
 function SimulatePage() {
   const [projectName, setProjectName] = useState("");
   const [items, setItems] = useState<EstimateItem[]>([makeItem()]);
   const [showResult, setShowResult] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const projectCreatedRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   const validItems = useMemo(() => items.filter((i) => i.hours > 0), [items]);
   const canSimulate = projectName.trim().length > 0 && validItems.length > 0;
 
-  // Kalkulasi langsung — diperbarui pada setiap ketikan, tanpa menunggu tombol Simulasikan.
+  // Kalkulasi langsung — diperbarui pada setiap ketikan, tanpa menunggu tombol.
   const result = useMemo(() => simulate(items), [items]);
+
+  // Placeholder contoh yang berganti untuk memberi inspirasi.
+  useEffect(() => {
+    const id = setInterval(
+      () => setPlaceholderIdx((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length),
+      2600,
+    );
+    return () => clearInterval(id);
+  }, []);
 
   const updateItem = (id: string, patch: Partial<EstimateItem>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     setShowResult(false);
   };
 
+  const setName = (value: string) => {
+    setProjectName(value);
+    setShowResult(false);
+    if (!projectCreatedRef.current && value.trim().length > 0) {
+      projectCreatedRef.current = true;
+      track("project_created");
+    }
+  };
+
   const addItem = () => {
     setItems((prev) => [...prev, makeItem()]);
     setShowResult(false);
+    track("estimate_item_added");
   };
 
   const removeItem = (id: string) => {
@@ -72,22 +106,51 @@ function SimulatePage() {
 
   const handleSimulate = () => {
     if (!canSimulate) return;
+    track("simulation_started", { items: validItems.length, hours: result.totalHours });
     setShowResult(true);
+    track("simulation_completed", {
+      hours: result.totalHours,
+      cost: result.totalCost,
+      risk: result.riskLevel,
+    });
     requestAnimationFrame(() =>
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
   };
 
+  const handleShare = async () => {
+    track("result_shared");
+    const summary = `Estimasi "${projectName}" — ${result.durationLabel} · ${formatMoney(
+      result.totalCost,
+    )} (${result.totalHours} jam). Dibuat dengan ESTIMO.`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: `Estimasi ${projectName}`, text: summary });
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(summary);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      }
+    } catch {
+      /* pengguna membatalkan — abaikan */
+    }
+  };
+
+  const recalculate = () => {
+    setShowResult(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const reset = () => {
     nextId = 1;
+    projectCreatedRef.current = false;
     setProjectName("");
     setItems([makeItem()]);
     setShowResult(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const durationLabel = result.totalHours > 0 ? `${result.weeks} mgg` : "—";
-  const costLabel = result.totalCost > 0 ? formatMoney(result.totalCost) : "—";
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +163,7 @@ function SimulatePage() {
             <ArrowLeft className="h-4 w-4" />
             Kembali
           </Link>
-          <span className="font-display text-sm font-semibold">Simulator Keputusan</span>
+          <span className="font-display text-sm font-bold tracking-tight">ESTIMO</span>
           <div className="flex items-center gap-2">
             <button
               onClick={reset}
@@ -120,22 +183,32 @@ function SimulatePage() {
               <SummaryStat
                 icon={<ListChecks className="h-3.5 w-3.5" />}
                 label="Pekerjaan"
-                value={`${validItems.length}`}
+                value={
+                  <AnimatedNumber value={validItems.length} />
+                }
               />
               <SummaryStat
                 icon={<Clock className="h-3.5 w-3.5" />}
                 label="Total jam"
-                value={result.totalHours > 0 ? `${result.totalHours}` : "—"}
+                value={
+                  result.totalHours > 0 ? <AnimatedNumber value={result.totalHours} /> : "—"
+                }
               />
               <SummaryStat
                 icon={<CalendarRange className="h-3.5 w-3.5" />}
                 label="Durasi"
-                value={durationLabel}
+                value={result.durationLabel}
               />
               <SummaryStat
                 icon={<Wallet className="h-3.5 w-3.5" />}
                 label="Biaya"
-                value={costLabel}
+                value={
+                  result.totalCost > 0 ? (
+                    <AnimatedNumber value={result.totalCost} format={formatMoney} />
+                  ) : (
+                    "—"
+                  )
+                }
                 highlight
               />
             </div>
@@ -146,14 +219,14 @@ function SimulatePage() {
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-6">
         {/* Header proyek yang ringkas */}
         <section className="rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {projectName.trim().length === 0 ? "✨ Proyek Baru" : "Nama proyek"}
+          </span>
           <input
             value={projectName}
-            onChange={(e) => {
-              setProjectName(e.target.value);
-              setShowResult(false);
-            }}
-            placeholder="Nama proyek — mis. Website Company Profile"
-            className="w-full bg-transparent text-lg font-bold tracking-tight outline-none placeholder:font-semibold placeholder:text-muted-foreground/50 sm:text-xl"
+            onChange={(e) => setName(e.target.value)}
+            placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
+            className="mt-1 w-full bg-transparent text-lg font-bold tracking-tight outline-none placeholder:font-semibold placeholder:text-muted-foreground/50 sm:text-xl"
           />
           <p className="mt-1 text-sm text-muted-foreground">
             {validItems.length} pekerjaan · {result.totalHours} jam
@@ -281,18 +354,48 @@ function SimulatePage() {
       {/* CTA utama — melekat di bawah untuk penggunaan satu tangan */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-5 py-3">
-          <button
-            onClick={handleSimulate}
-            disabled={!canSimulate}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-          >
-            <Sparkles className="h-4.5 w-4.5" />
-            Simulasikan
-          </button>
-          {!canSimulate && (
-            <p className="mt-2 text-center text-xs text-muted-foreground">
-              Isi nama proyek dan minimal satu pekerjaan dengan jam untuk menyimulasikan.
-            </p>
+          {showResult ? (
+            <div className="flex gap-2">
+              <button
+                onClick={recalculate}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-input bg-background px-5 py-4 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Hitung Ulang
+              </button>
+              <button
+                onClick={handleShare}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5"
+              >
+                {shared ? (
+                  <>
+                    <Check className="h-4.5 w-4.5" />
+                    Tersalin
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4.5 w-4.5" />
+                    Bagikan Hasil
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={handleSimulate}
+                disabled={!canSimulate}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+              >
+                <Sparkles className="h-4.5 w-4.5" />
+                Simulasikan Estimasi
+              </button>
+              {!canSimulate && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                  Isi nama proyek dan minimal satu pekerjaan dengan jam untuk menyimulasikan.
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -308,7 +411,7 @@ function SummaryStat({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
   highlight?: boolean;
 }) {
   return (
@@ -345,7 +448,7 @@ function Results({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Simulasi untuk
+            Estimasi untuk
           </p>
           <h2 className="truncate text-xl font-bold">{projectName}</h2>
         </div>
@@ -358,20 +461,20 @@ function Results({
         <StatCard
           icon={<Clock className="h-4 w-4" />}
           label="Total jam"
-          value={`${result.totalHours.toLocaleString("id-ID")} jam`}
-          hint={`+${result.bufferHours} jam buffer disarankan`}
+          value={`${result.totalHours.toLocaleString("id-ID")} Jam`}
+          hint={`Disarankan +${result.bufferHours} jam buffer · ideal ${result.idealHours.toLocaleString("id-ID")} Jam`}
         />
         <StatCard
           icon={<CalendarRange className="h-4 w-4" />}
           label="Estimasi durasi"
-          value={`${result.weeks} mgg`}
-          hint={`${result.workingDays} hari kerja`}
+          value={result.durationLabel}
+          hint={`${result.totalHours.toLocaleString("id-ID")} jam kerja`}
         />
         <StatCard
           icon={<Wallet className="h-4 w-4" />}
           label="Estimasi biaya"
           value={formatMoney(result.totalCost)}
-          hint="Jam × tarif"
+          hint={`Rata-rata ${formatMoney(result.averageRate)} per jam`}
           highlight
         />
       </div>
@@ -381,13 +484,13 @@ function Results({
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </span>
-          <h3 className="text-sm font-semibold">Rekomendasi</h3>
+          <h3 className="text-sm font-semibold">Insight</h3>
         </div>
         <p className="mt-3 text-[0.95rem] leading-relaxed text-foreground">
-          {result.recommendation}
+          {result.insight}
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
-          Berdasarkan {FOCUS_HOURS_PER_DAY} jam fokus/hari selama 5 hari kerja seminggu.
+          Berdasarkan {WORK_HOURS_PER_DAY} jam kerja/hari selama 5 hari kerja seminggu.
         </p>
       </div>
     </div>
