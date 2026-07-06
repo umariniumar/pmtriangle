@@ -33,7 +33,7 @@ import { formatClientShareText } from "@/lib/share-text";
 import { copyToClipboard } from "@/lib/share";
 import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
 import { bagikanProyek } from "@/lib/share-card-engine";
-import { ShareCardTemplate } from "@/components/share-card/share-card-template";
+import { ShareCardExportPortal } from "@/components/share-card/share-card-export-portal";
 import { AnimatedNumber } from "@/components/animated-number";
 import { EstimoLogo } from "@/components/estimo-logo";
 import { ProjectSummaryCard } from "@/components/project-summary-card";
@@ -408,19 +408,14 @@ function SimulatePage() {
             />
           </div>
         )}
-
-        {showResult && (
-          <div
-            aria-hidden
-            className="pointer-events-none fixed left-[-10000px] top-0 overflow-hidden"
-          >
-            <ShareCardTemplate ref={shareCardRef} data={shareCardData} />
-          </div>
-        )}
       </main>
 
+      {showResult && (
+        <ShareCardExportPortal cardRef={shareCardRef} data={shareCardData} />
+      )}
+
       {/* CTA utama — melekat di bawah untuk penggunaan satu tangan */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/90 backdrop-blur-md">
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-5 py-3">
           {showResult ? (
             <div className="grid grid-cols-3 gap-2">

@@ -1,7 +1,9 @@
 import { cn } from "@/lib/utils";
 
 const LOGO_ASPECT = 864 / 240;
-const LOGO_SRC = "/estimo-logo.svg";
+
+/** Beta: PNG wordmark. Ganti ke `/estimo-logo.svg` setelah asset vektor final tersedia. */
+const LOGO_SRC = "/estimo-logo.png";
 
 type EstimoLogoProps = {
   className?: string;
