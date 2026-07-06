@@ -22,13 +22,11 @@ import {
   simulate,
 } from "@/lib/simulator";
 import { track } from "@/lib/analytics";
-import { formatBrandedShareText, formatClientShareText } from "@/lib/share-text";
-import {
-  canUseNativeShare,
-  copyToClipboard,
-  nativeShare,
-  openWhatsAppShare,
-} from "@/lib/share";
+import { formatClientShareText } from "@/lib/share-text";
+import { copyToClipboard } from "@/lib/share";
+import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
+import { bagikanProyek } from "@/lib/share-card-engine";
+import { ShareCardTemplate } from "@/components/share-card/share-card-template";
 import { AnimatedNumber } from "@/components/animated-number";
 import { ProjectSummaryCard } from "@/components/project-summary-card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -66,9 +64,11 @@ function SimulatePage() {
   const [projectName, setProjectName] = useState("");
   const [items, setItems] = useState<EstimateItem[]>([makeItem()]);
   const [showResult, setShowResult] = useState(false);
+  const [isSharingCard, setIsSharingCard] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const projectCreatedRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   const validItems = useMemo(() => items.filter((i) => i.hours > 0), [items]);
   const canSimulate = projectName.trim().length > 0 && validItems.length > 0;
@@ -124,6 +124,17 @@ function SimulatePage() {
     );
   };
 
+  const shareCardData = useMemo(
+    () =>
+      buildShareCardData(
+        projectName,
+        result.projectSummary,
+        result.durationLabel,
+        result.totalCost,
+      ),
+    [projectName, result],
+  );
+
   const shareInput = useMemo(
     () => ({
       projectName,
@@ -146,21 +157,25 @@ function SimulatePage() {
   };
 
   const handleShareResult = async () => {
-    const text = formatBrandedShareText(shareInput);
-    const title = projectName.trim() || "Proyek";
+    const cardElement = shareCardRef.current;
+    if (!cardElement || isSharingCard) return;
 
-    if (canUseNativeShare()) {
-      const outcome = await nativeShare(title, text);
-      if (outcome === "shared") {
-        track("result_shared", { channel: "native" });
-        toast.success("Estimasi berhasil dibagikan.");
-      }
-      return;
+    setIsSharingCard(true);
+    const toastId = toast.loading("Menyiapkan kartu estimasi...");
+
+    try {
+      await bagikanProyek({
+        channel: "image",
+        cardElement,
+        filename: shareCardFilename(projectName),
+      });
+      track("result_shared", { channel: "image" });
+      toast.success("Kartu estimasi berhasil diunduh.", { id: toastId });
+    } catch {
+      toast.error("Gagal mengunduh kartu estimasi. Coba lagi.", { id: toastId });
+    } finally {
+      setIsSharingCard(false);
     }
-
-    openWhatsAppShare(text);
-    track("result_shared", { channel: "whatsapp" });
-    toast.success("Membuka WhatsApp...");
   };
 
   const recalculate = () => {
@@ -378,6 +393,15 @@ function SimulatePage() {
             />
           </div>
         )}
+
+        {showResult && (
+          <div
+            aria-hidden
+            className="pointer-events-none fixed left-[-10000px] top-0 overflow-hidden"
+          >
+            <ShareCardTemplate ref={shareCardRef} data={shareCardData} />
+          </div>
+        )}
       </main>
 
       {/* CTA utama — melekat di bawah untuk penggunaan satu tangan */}
@@ -403,7 +427,8 @@ function SimulatePage() {
               </button>
               <button
                 onClick={handleShareResult}
-                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
+                disabled={isSharingCard}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
               >
                 <Share2 className="h-4 w-4 shrink-0" />
                 <span className="leading-none">Bagikan</span>

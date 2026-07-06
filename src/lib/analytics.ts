@@ -15,7 +15,7 @@ export type AnalyticsEvent =
   | "result_shared"
   | "feedback_clicked";
 
-export type ShareChannel = "copy" | "native" | "whatsapp";
+export type ShareChannel = "copy" | "native" | "whatsapp" | "image";
 
 export type AnalyticsProps = Record<string, string | number | boolean | undefined>;
 
