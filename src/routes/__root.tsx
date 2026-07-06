@@ -12,10 +12,12 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { Toaster } from "../components/ui/sonner";
 import { AnalyticsProvider } from "../lib/analytics";
-import { getOgImageUrl } from "../lib/app-url";
+import { getAppUrl, getOgImageUrl } from "../lib/app-url";
+import { BRAND_NAME, BRAND_THEME_COLOR } from "../lib/brand";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 const ogImageUrl = getOgImageUrl();
+const appUrl = getAppUrl();
 
 function NotFoundComponent() {
   return (
@@ -88,9 +90,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Simulasikan sebelum memutuskan. Perkirakan total jam, durasi, dan biaya proyek dalam waktu kurang dari tiga menit, lalu dapatkan insight yang jelas.",
       },
-      { name: "author", content: "ESTIMO" },
-      { name: "application-name", content: "ESTIMO" },
-      { property: "og:site_name", content: "ESTIMO" },
+      { name: "author", content: BRAND_NAME },
+      { name: "application-name", content: BRAND_NAME },
+      { name: "apple-mobile-web-app-title", content: BRAND_NAME },
+      { name: "theme-color", content: BRAND_THEME_COLOR },
+      { property: "og:site_name", content: BRAND_NAME },
       {
         property: "og:title",
         content: "ESTIMO — Simulasikan sebelum memutuskan",
@@ -101,6 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Perkirakan durasi dan biaya proyek sebelum mulai. Tambahkan pekerjaan, klik simulasikan, dapatkan insight.",
       },
       { property: "og:type", content: "website" },
+      ...(appUrl ? [{ property: "og:url", content: appUrl }] : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "ESTIMO — Simulasikan sebelum memutuskan" },
       {
@@ -116,8 +121,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/estimo-logo.png", type: "image/png" },
-      { rel: "apple-touch-icon", href: "/estimo-logo.png" },
+      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "preconnect",

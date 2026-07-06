@@ -1,3 +1,5 @@
+import { LOGO_WORDMARK_PNG } from "@/lib/brand";
+
 /** URL publik aplikasi — set via VITE_APP_URL (mis. https://estimo.kodekoding.com). */
 export function getAppUrl(): string {
   const fromEnv = import.meta.env.VITE_APP_URL;
@@ -10,9 +12,9 @@ export function getAppUrl(): string {
   return "";
 }
 
-const LOGO_EXPORT_FILE = "estimo-logo.png";
+const LOGO_EXPORT_FILE = LOGO_WORDMARK_PNG.replace(/^\//, "");
 
-/** URL absolut logo PNG untuk ekspor kartu (html-to-image). */
+/** URL absolut logo wordmark PNG untuk ekspor kartu (html-to-image). */
 export function getLogoAssetUrl(): string {
   if (typeof window !== "undefined") {
     return `${window.location.origin}/${LOGO_EXPORT_FILE}`;
@@ -21,7 +23,7 @@ export function getLogoAssetUrl(): string {
   return appUrl ? `${appUrl}/${LOGO_EXPORT_FILE}` : `/${LOGO_EXPORT_FILE}`;
 }
 
-/** URL absolut untuk metadata Open Graph. */
+/** URL absolut untuk metadata Open Graph / Twitter. */
 export function getOgImageUrl(): string {
   const appUrl = getAppUrl();
   if (appUrl) return `${appUrl}/${LOGO_EXPORT_FILE}`;

@@ -147,7 +147,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardTemplatePro
           >
             <img
               src={data.logoUrl}
-              alt="estimo"
+              alt="ESTIMO"
               width={140}
               height={39}
               style={{
