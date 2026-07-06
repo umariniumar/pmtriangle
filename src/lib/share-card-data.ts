@@ -1,4 +1,4 @@
-import { getAppUrl } from "@/lib/app-url";
+import { getAppUrl, getLogoAssetUrl } from "@/lib/app-url";
 import type { ProjectSummary } from "@/lib/project-summary";
 import { formatMoney } from "@/lib/simulator";
 
@@ -10,6 +10,7 @@ export type ShareCardData = {
   costLabel: string;
   recommendation: string;
   appUrl: string;
+  logoUrl: string;
 };
 
 export function buildShareCardData(
@@ -26,6 +27,7 @@ export function buildShareCardData(
     costLabel: formatMoney(totalCost),
     recommendation: summary.recommendation,
     appUrl: getAppUrl(),
+    logoUrl: getLogoAssetUrl(),
   };
 }
 

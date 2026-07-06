@@ -11,7 +11,11 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "../components/ui/sonner";
+import { AnalyticsProvider } from "../lib/analytics";
+import { getOgImageUrl } from "../lib/app-url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+
+const ogImageUrl = getOgImageUrl();
 
 function NotFoundComponent() {
   return (
@@ -104,15 +108,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Perkirakan durasi dan biaya proyek sebelum mulai. Tambahkan pekerjaan, klik simulasikan, dapatkan insight.",
       },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6867379b-2811-4393-bed5-786d5127d520/id-preview-2e5ebe56--54433566-41a1-4486-bd1c-ec3f4834ba39.lovable.app-1783189922838.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6867379b-2811-4393-bed5-786d5127d520/id-preview-2e5ebe56--54433566-41a1-4486-bd1c-ec3f4834ba39.lovable.app-1783189922838.png" },
+      { property: "og:image", content: ogImageUrl },
+      { name: "twitter:image", content: ogImageUrl },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/estimo-logo.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/estimo-logo.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "preconnect",
@@ -152,10 +157,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster position="top-center" richColors closeButton />
-    </QueryClientProvider>
+    <AnalyticsProvider>
+      <QueryClientProvider client={queryClient}>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster position="top-center" richColors closeButton />
+      </QueryClientProvider>
+    </AnalyticsProvider>
   );
 }

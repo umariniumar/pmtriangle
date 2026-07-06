@@ -21,13 +21,21 @@ import {
   itemCost,
   simulate,
 } from "@/lib/simulator";
-import { track } from "@/lib/analytics";
+import {
+  trackShareActionFailed,
+  trackShareCardDownloaded,
+  trackSimulationCompleted,
+  trackSimulationStarted,
+  trackSummaryCopied,
+  useSimulationAbandonTracking,
+} from "@/lib/analytics";
 import { formatClientShareText } from "@/lib/share-text";
 import { copyToClipboard } from "@/lib/share";
 import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
 import { bagikanProyek } from "@/lib/share-card-engine";
 import { ShareCardTemplate } from "@/components/share-card/share-card-template";
 import { AnimatedNumber } from "@/components/animated-number";
+import { EstimoLogo } from "@/components/estimo-logo";
 import { ProjectSummaryCard } from "@/components/project-summary-card";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -66,9 +74,11 @@ function SimulatePage() {
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
-  const projectCreatedRef = useRef(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
+  const simulationCompletedRef = useRef(false);
+
+  useSimulationAbandonTracking(simulationCompletedRef);
 
   const validItems = useMemo(() => items.filter((i) => i.hours > 0), [items]);
   const canSimulate = projectName.trim().length > 0 && validItems.length > 0;
@@ -93,16 +103,11 @@ function SimulatePage() {
   const setName = (value: string) => {
     setProjectName(value);
     setShowResult(false);
-    if (!projectCreatedRef.current && value.trim().length > 0) {
-      projectCreatedRef.current = true;
-      track("project_created");
-    }
   };
 
   const addItem = () => {
     setItems((prev) => [...prev, makeItem()]);
     setShowResult(false);
-    track("estimate_item_added");
   };
 
   const removeItem = (id: string) => {
@@ -110,15 +115,22 @@ function SimulatePage() {
     setShowResult(false);
   };
 
+  const simulationMeta = useMemo(
+    () => ({
+      scale: result.projectSummary.scale,
+      totalHours: result.totalHours,
+      totalCost: result.totalCost,
+      taskCount: validItems.length,
+    }),
+    [result, validItems.length],
+  );
+
   const handleSimulate = () => {
     if (!canSimulate) return;
-    track("simulation_started", { items: validItems.length, hours: result.totalHours });
+    trackSimulationStarted(simulationMeta);
     setShowResult(true);
-    track("simulation_completed", {
-      hours: result.totalHours,
-      cost: result.totalCost,
-      risk: result.riskLevel,
-    });
+    simulationCompletedRef.current = true;
+    trackSimulationCompleted(simulationMeta);
     requestAnimationFrame(() =>
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
@@ -149,10 +161,11 @@ function SimulatePage() {
   const handleCopySummary = async () => {
     const copied = await copyToClipboard(formatClientShareText(shareInput));
     if (copied) {
-      track("result_shared", { channel: "copy" });
+      trackSummaryCopied("copy");
       toast.success("Ringkasan berhasil disalin.");
       return;
     }
+    trackShareActionFailed("copy_summary", "clipboard_unavailable");
     toast.error("Gagal menyalin ringkasan. Coba lagi.");
   };
 
@@ -169,9 +182,10 @@ function SimulatePage() {
         cardElement,
         filename: shareCardFilename(projectName),
       });
-      track("result_shared", { channel: "image" });
+      trackShareCardDownloaded("image");
       toast.success("Kartu estimasi berhasil diunduh.", { id: toastId });
     } catch {
+      trackShareActionFailed("share_card", "render_or_download_failed");
       toast.error("Gagal mengunduh kartu estimasi. Coba lagi.", { id: toastId });
     } finally {
       setIsSharingCard(false);
@@ -185,7 +199,6 @@ function SimulatePage() {
 
   const reset = () => {
     nextId = 1;
-    projectCreatedRef.current = false;
     setProjectName("");
     setItems([makeItem()]);
     setShowResult(false);
@@ -203,7 +216,9 @@ function SimulatePage() {
             <ArrowLeft className="h-4 w-4" />
             Kembali
           </Link>
-          <span className="font-display text-sm font-bold tracking-tight">ESTIMO</span>
+          <Link to="/" className="inline-flex items-center py-1">
+            <EstimoLogo height={22} />
+          </Link>
           <div className="flex items-center gap-2">
             <button
               onClick={reset}

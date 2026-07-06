@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
+import { EstimoLogo } from "@/components/estimo-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { track } from "@/lib/analytics";
+import { trackCtaClicked, trackLandingView } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -10,25 +11,20 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   useEffect(() => {
-    track("landing_view");
+    trackLandingView();
   }, []);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground shadow-soft">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <span className="font-display text-base font-bold tracking-tight">
-            ESTIMO
-          </span>
+        <Link to="/" className="flex items-center py-1">
+          <EstimoLogo height={26} />
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Link
             to="/simulate"
-            onClick={() => track("start_estimation", { source: "header" })}
+            onClick={() => trackCtaClicked("header")}
             className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5"
           >
             Mulai
@@ -59,7 +55,7 @@ function Landing() {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/simulate"
-                onClick={() => track("start_estimation", { source: "hero" })}
+                onClick={() => trackCtaClicked("hero")}
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:w-auto"
               >
                 Mulai Estimasi
@@ -94,8 +90,11 @@ function Landing() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-5 py-6 text-center text-xs text-muted-foreground">
-          ESTIMO — kejelasan di atas kerumitan.
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-5 py-6">
+          <EstimoLogo height={22} className="opacity-80" />
+          <p className="text-center text-xs text-muted-foreground">
+            Kejelasan di atas kerumitan.
+          </p>
         </div>
       </footer>
     </div>

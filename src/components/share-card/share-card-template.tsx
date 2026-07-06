@@ -145,17 +145,17 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardTemplatePro
               gap: 24,
             }}
           >
-            <span
+            <img
+              src={data.logoUrl}
+              alt="estimo"
+              width={140}
+              height={39}
               style={{
-                fontFamily: t.fonts.display,
-                fontSize: 28,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: t.text.accent,
+                display: "block",
+                objectFit: "contain",
+                objectPosition: "left center",
               }}
-            >
-              ESTIMO
-            </span>
+            />
             {data.appUrl ? (
               <span
                 style={{
