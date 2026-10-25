@@ -30,11 +30,23 @@ import {
   type ExperienceLevel,
   type FlexibleDimension,
   type RevisionCount,
+  type SimulationResult,
   formatHoursLabel,
   formatMoney,
   itemCost,
   simulate,
 } from "@/lib/simulator";
+import {
+  compareToBaseline,
+  createBaselineSnapshot,
+  createChangeLogEntry,
+  detectBaselineConflict,
+  type BaselineComparison,
+  type BaselineConflict,
+  type BaselineSnapshot,
+  type ChangeLogEntry,
+  type ChangeLogField,
+} from "@/lib/baseline";
 import {
   trackShareActionFailed,
   trackShareCardDownloaded,
@@ -100,6 +112,57 @@ function parseRevisionCount(value: string): RevisionCount {
   return value === "unlimited" ? "unlimited" : parseNonNegative(value);
 }
 
+function revisionLabel(revisionCount: RevisionCount | undefined): string {
+  const value = revisionSelectValue(revisionCount);
+  return REVISION_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+const RISK_LABELS: Record<SimulationResult["riskLevel"], string> = {
+  low: "Rendah",
+  moderate: "Sedang",
+  high: "Tinggi",
+};
+
+// Field pada EstimateItem yang perubahannya dicatat di Change Log. Nama
+// pekerjaan sengaja tidak termasuk — bukan bagian dari Tugas 3.
+function describeItemChange(
+  key: keyof EstimateItem,
+  before: EstimateItem,
+  after: EstimateItem,
+): { field: ChangeLogField; description: string } | null {
+  const label = after.name.trim() || before.name.trim() || "Pekerjaan";
+
+  switch (key) {
+    case "hours":
+      return {
+        field: "base_hours",
+        description: `Jam dasar "${label}" diubah dari ${before.hours} jam menjadi ${after.hours} jam.`,
+      };
+    case "rate":
+      return {
+        field: "rate",
+        description: `Tarif "${label}" diubah dari ${formatMoney(before.rate)} menjadi ${formatMoney(after.rate)}.`,
+      };
+    case "complexity":
+      return {
+        field: "complexity",
+        description: `Kompleksitas "${label}" diubah dari ${before.complexity ?? DEFAULT_COMPLEXITY} menjadi ${after.complexity ?? DEFAULT_COMPLEXITY}.`,
+      };
+    case "experience":
+      return {
+        field: "experience",
+        description: `Pengalaman "${label}" diubah dari ${before.experience ?? DEFAULT_EXPERIENCE} menjadi ${after.experience ?? DEFAULT_EXPERIENCE}.`,
+      };
+    case "revisionCount":
+      return {
+        field: "revision",
+        description: `Revisi "${label}" diubah dari ${revisionLabel(before.revisionCount)} menjadi ${revisionLabel(after.revisionCount)}.`,
+      };
+    default:
+      return null;
+  }
+}
+
 const PLACEHOLDER_EXAMPLES = [
   "Website Company Profile",
   "Landing Page",
@@ -115,6 +178,8 @@ function SimulatePage() {
   );
   const [focusHoursPerDay, setFocusHoursPerDay] = useState(DEFAULT_FOCUS_HOURS_PER_DAY);
   const [deadlineDays, setDeadlineDays] = useState<number | undefined>(undefined);
+  const [baseline, setBaseline] = useState<BaselineSnapshot | null>(null);
+  const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
@@ -141,6 +206,28 @@ function SimulatePage() {
     [flexibleDimension],
   );
 
+  const baselineComparison = useMemo<BaselineComparison | null>(
+    () => (baseline ? compareToBaseline(baseline, result) : null),
+    [baseline, result],
+  );
+
+  const baselineConflict = useMemo<BaselineConflict | null>(
+    () => (baseline ? detectBaselineConflict(baseline, result, flexibleDimension) : null),
+    [baseline, result, flexibleDimension],
+  );
+
+  // Mencatat satu entri Change Log — tidak melakukan apa-apa kalau Baseline
+  // belum dikunci, sesuai aturan: perubahan sebelum Baseline tidak dicatat.
+  const logChange = (
+    field: ChangeLogField,
+    description: string,
+    before: SimulationResult,
+    after: SimulationResult,
+  ) => {
+    if (!baseline) return;
+    setChangeLog((prev) => [createChangeLogEntry(field, description, before, after), ...prev]);
+  };
+
   // Placeholder contoh yang berganti untuk memberi inspirasi.
   useEffect(() => {
     const id = setInterval(
@@ -151,7 +238,18 @@ function SimulatePage() {
   }, []);
 
   const updateItem = (id: string, patch: Partial<EstimateItem>) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    const before = items.find((i) => i.id === id);
+    const newItems = items.map((i) => (i.id === id ? { ...i, ...patch } : i));
+    if (baseline && before) {
+      const after = newItems.find((i) => i.id === id)!;
+      const beforeResult = result;
+      const afterResult = simulate(newItems, { focusHoursPerDay, deadlineDays });
+      for (const key of Object.keys(patch) as (keyof EstimateItem)[]) {
+        const change = describeItemChange(key, before, after);
+        if (change) logChange(change.field, change.description, beforeResult, afterResult);
+      }
+    }
+    setItems(newItems);
     setShowResult(false);
   };
 
@@ -161,13 +259,77 @@ function SimulatePage() {
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, makeItem()]);
+    const newItem = makeItem();
+    const newItems = [...items, newItem];
+    if (baseline) {
+      const afterResult = simulate(newItems, { focusHoursPerDay, deadlineDays });
+      logChange("item_added", "Pekerjaan baru ditambahkan.", result, afterResult);
+    }
+    setItems(newItems);
     setShowResult(false);
   };
 
   const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    const removedItem = items.find((i) => i.id === id);
+    const newItems = items.filter((i) => i.id !== id);
+    if (baseline) {
+      const afterResult = simulate(newItems, { focusHoursPerDay, deadlineDays });
+      const label = removedItem?.name.trim() || "Pekerjaan";
+      logChange("item_removed", `Pekerjaan "${label}" dihapus.`, result, afterResult);
+    }
+    setItems(newItems);
     setShowResult(false);
+  };
+
+  const handleFlexibleDimensionChange = (value: FlexibleDimension) => {
+    if (value === flexibleDimension) return;
+    if (baseline) {
+      logChange(
+        "flexible_dimension",
+        `Dimensi fleksibel diubah dari ${FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} menjadi ${FLEXIBLE_DIMENSION_LABELS[value]}.`,
+        result,
+        result,
+      );
+    }
+    setFlexibleDimension(value);
+  };
+
+  const handleFocusHoursChange = (value: number) => {
+    if (baseline) {
+      const afterResult = simulate(items, { focusHoursPerDay: value, deadlineDays });
+      logChange(
+        "focus_hours_per_day",
+        `Jam fokus per hari diubah dari ${focusHoursPerDay} jam menjadi ${value} jam.`,
+        result,
+        afterResult,
+      );
+    }
+    setFocusHoursPerDay(value);
+  };
+
+  const handleDeadlineChange = (value: number | undefined) => {
+    if (baseline) {
+      const afterResult = simulate(items, { focusHoursPerDay, deadlineDays: value });
+      const beforeLabel = deadlineDays ? `${deadlineDays} hari` : "tidak ada";
+      const afterLabel = value ? `${value} hari` : "tidak ada";
+      logChange(
+        "deadline_days",
+        `Deadline diubah dari ${beforeLabel} menjadi ${afterLabel}.`,
+        result,
+        afterResult,
+      );
+    }
+    setDeadlineDays(value);
+  };
+
+  const handleLockBaseline = () => {
+    setBaseline(createBaselineSnapshot(projectName, result, flexibleDimension, deadlineDays));
+    setChangeLog([]);
+  };
+
+  const handleResetBaseline = () => {
+    setBaseline(null);
+    setChangeLog([]);
   };
 
   const simulationMeta = useMemo(
@@ -259,6 +421,8 @@ function SimulatePage() {
     setFlexibleDimension(DEFAULT_FLEXIBLE_DIMENSION);
     setFocusHoursPerDay(DEFAULT_FOCUS_HOURS_PER_DAY);
     setDeadlineDays(undefined);
+    setBaseline(null);
+    setChangeLog([]);
     setShowResult(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -353,7 +517,7 @@ function SimulatePage() {
                 <button
                   key={dimension}
                   type="button"
-                  onClick={() => setFlexibleDimension(dimension)}
+                  onClick={() => handleFlexibleDimensionChange(dimension)}
                   className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
                     flexibleDimension === dimension
                       ? "border-primary bg-primary text-primary-foreground"
@@ -380,7 +544,7 @@ function SimulatePage() {
               max={8}
               step={1}
               value={focusHoursPerDay}
-              onChange={(e) => setFocusHoursPerDay(Number(e.target.value))}
+              onChange={(e) => handleFocusHoursChange(Number(e.target.value))}
               className="mt-2 w-full accent-primary"
               aria-label="Jam fokus per hari"
             />
@@ -401,11 +565,11 @@ function SimulatePage() {
               onChange={(e) => {
                 const raw = e.target.value;
                 if (raw.trim() === "") {
-                  setDeadlineDays(undefined);
+                  handleDeadlineChange(undefined);
                   return;
                 }
                 const n = Number(raw);
-                setDeadlineDays(Number.isFinite(n) && n > 0 ? n : undefined);
+                handleDeadlineChange(Number.isFinite(n) && n > 0 ? n : undefined);
               }}
               placeholder="Misal 5"
               className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
@@ -590,6 +754,12 @@ function SimulatePage() {
               flexibleDimension={flexibleDimension}
               rigidDimensionLabel={rigidDimensionLabel}
               deadlineDays={deadlineDays}
+              baseline={baseline}
+              changeLog={changeLog}
+              baselineComparison={baselineComparison}
+              baselineConflict={baselineConflict}
+              onLockBaseline={handleLockBaseline}
+              onResetBaseline={handleResetBaseline}
             />
           </div>
         )}
@@ -683,6 +853,12 @@ function Results({
   flexibleDimension,
   rigidDimensionLabel,
   deadlineDays,
+  baseline,
+  changeLog,
+  baselineComparison,
+  baselineConflict,
+  onLockBaseline,
+  onResetBaseline,
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
@@ -690,9 +866,18 @@ function Results({
   flexibleDimension: FlexibleDimension;
   rigidDimensionLabel: string;
   deadlineDays?: number;
+  baseline: BaselineSnapshot | null;
+  changeLog: ChangeLogEntry[];
+  baselineComparison: BaselineComparison | null;
+  baselineConflict: BaselineConflict | null;
+  onLockBaseline: () => void;
+  onResetBaseline: () => void;
 }) {
   const hasDeadline = typeof deadlineDays === "number" && deadlineDays > 0;
   const isOverDeadline = hasDeadline && result.workingDays > deadlineDays;
+  const hasConflict = Boolean(
+    baseline && baselineConflict && baselineConflict.movedDimensions.length > 0,
+  );
 
   return (
     <div>
@@ -705,6 +890,135 @@ function Results({
           {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
         </p>
       </div>
+
+      {!baseline && (
+        <div className="mb-4 rounded-2xl border border-dashed border-primary/40 bg-accent/40 p-4">
+          <p className="text-sm font-semibold">Kunci Baseline untuk melacak perubahan</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Setelah dikunci, setiap perubahan tercatat di Change Log dan dibandingkan dengan
+            Baseline ini.
+          </p>
+          <button
+            type="button"
+            onClick={onLockBaseline}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            Kunci Baseline
+          </button>
+        </div>
+      )}
+
+      {hasConflict && baselineConflict && (
+        <div className="mb-4 rounded-2xl border border-destructive/40 bg-destructive/10 p-4">
+          <p className="text-sm font-semibold text-destructive">
+            {baselineConflict.movedDimensions
+              .map((dimension) => FLEXIBLE_DIMENSION_LABELS[dimension])
+              .join(" & ")}{" "}
+            bergerak dari Baseline
+          </p>
+          <p className="mt-1 text-xs text-destructive/80">
+            {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} dipilih sebagai dimensi fleksibel, jadi
+            perubahan ini seharusnya diserap lewat penyesuaian{" "}
+            {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} — bukan membiarkan{" "}
+            {baselineConflict.movedDimensions
+              .map((dimension) => FLEXIBLE_DIMENSION_LABELS[dimension])
+              .join(" & ")}{" "}
+            bergeser diam-diam.
+          </p>
+        </div>
+      )}
+
+      {baseline && baselineComparison && (
+        <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Baseline vs Skenario
+            </p>
+            <button
+              type="button"
+              onClick={onResetBaseline}
+              className="shrink-0 text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Mulai Ulang Baseline
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Baseline</p>
+              <p className="mt-1 font-display text-base font-bold tracking-tight">
+                {formatMoney(baseline.totalCost)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatHoursLabel(baseline.totalHours)} · {baseline.durationLabel} ·{" "}
+                {baseline.workingDays} hari kerja
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Skenario saat ini</p>
+              <p className="mt-1 font-display text-base font-bold tracking-tight">
+                {formatMoney(result.totalCost)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatHoursLabel(result.totalHours)} · {result.durationLabel} ·{" "}
+                {result.workingDays} hari kerja
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <DeltaBadge
+              zeroLabel="Jam tetap"
+              value={baselineComparison.hoursDelta}
+              formatValue={(v) => formatHoursLabel(v)}
+            />
+            <DeltaBadge
+              zeroLabel="Biaya tetap"
+              value={baselineComparison.costDelta}
+              formatValue={(v) => formatMoney(v)}
+            />
+            <DeltaBadge
+              zeroLabel="Hari kerja tetap"
+              value={baselineComparison.workingDaysDelta}
+              formatValue={(v) => `${v} hari kerja`}
+            />
+          </div>
+        </div>
+      )}
+
+      {baseline && (
+        <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Change Log
+          </p>
+          {changeLog.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Belum ada perubahan sejak Baseline dikunci.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {changeLog.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="border-t border-border/60 pt-3 first:border-t-0 first:pt-0"
+                >
+                  <p className="text-sm font-medium">{entry.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatHoursLabel(entry.before.totalHours)} →{" "}
+                    {formatHoursLabel(entry.after.totalHours)} ·{" "}
+                    {formatMoney(entry.before.totalCost)} → {formatMoney(entry.after.totalCost)} ·{" "}
+                    {entry.before.durationLabel} → {entry.after.durationLabel}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Risiko: {RISK_LABELS[entry.before.riskLevel]} →{" "}
+                    {RISK_LABELS[entry.after.riskLevel]}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
@@ -784,6 +1098,33 @@ function Results({
 
       <ProjectSummaryCard summary={result.projectSummary} onCopySummary={onCopySummary} />
     </div>
+  );
+}
+
+function DeltaBadge({
+  zeroLabel,
+  value,
+  formatValue,
+}: {
+  zeroLabel: string;
+  value: number;
+  formatValue: (value: number) => string;
+}) {
+  if (value === 0) {
+    return (
+      <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+        {zeroLabel}
+      </span>
+    );
+  }
+
+  const sign = value > 0 ? "+" : "−";
+
+  return (
+    <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
+      {sign}
+      {formatValue(Math.abs(value))}
+    </span>
   );
 }
 
