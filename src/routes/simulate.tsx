@@ -16,7 +16,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  COMPLEXITY_LEVELS,
+  DEFAULT_COMPLEXITY,
+  DEFAULT_EXPERIENCE,
+  DEFAULT_REVISION_COUNT,
+  EXPERIENCE_LEVELS,
+  type ComplexityLevel,
   type EstimateItem,
+  type ExperienceLevel,
+  type RevisionCount,
+  formatHoursLabel,
   formatMoney,
   itemCost,
   simulate,
@@ -59,7 +68,32 @@ const makeItem = (): EstimateItem => ({
   name: "",
   hours: 0,
   rate: 0,
+  complexity: DEFAULT_COMPLEXITY,
+  experience: DEFAULT_EXPERIENCE,
+  revisionCount: DEFAULT_REVISION_COUNT,
 });
+
+const REVISION_OPTIONS: { value: string; label: string }[] = [
+  { value: "0", label: "0" },
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "unlimited", label: "Tak terbatas" },
+];
+
+function parseNonNegative(value: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+function revisionSelectValue(revisionCount: RevisionCount | undefined): string {
+  return revisionCount === "unlimited" ? "unlimited" : String(revisionCount ?? 0);
+}
+
+function parseRevisionCount(value: string): RevisionCount {
+  return value === "unlimited" ? "unlimited" : parseNonNegative(value);
+}
 
 const PLACEHOLDER_EXAMPLES = [
   "Website Company Profile",
@@ -238,16 +272,12 @@ function SimulatePage() {
               <SummaryStat
                 icon={<ListChecks className="h-3.5 w-3.5" />}
                 label="Pekerjaan"
-                value={
-                  <AnimatedNumber value={validItems.length} />
-                }
+                value={<AnimatedNumber value={validItems.length} />}
               />
               <SummaryStat
                 icon={<Clock className="h-3.5 w-3.5" />}
                 label="Total jam"
-                value={
-                  result.totalHours > 0 ? <AnimatedNumber value={result.totalHours} /> : "—"
-                }
+                value={result.totalHours > 0 ? <AnimatedNumber value={result.totalHours} /> : "—"}
               />
               <SummaryStat
                 icon={<CalendarRange className="h-3.5 w-3.5" />}
@@ -293,9 +323,7 @@ function SimulatePage() {
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="text-sm font-semibold">Daftar Pekerjaan</h2>
             {items.length > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {validItems.length} dihitung
-              </span>
+              <span className="text-xs text-muted-foreground">{validItems.length} dihitung</span>
             )}
           </div>
 
@@ -350,7 +378,7 @@ function SimulatePage() {
                         inputMode="numeric"
                         value={item.hours || ""}
                         onChange={(e) =>
-                          updateItem(item.id, { hours: Math.max(0, Number(e.target.value)) })
+                          updateItem(item.id, { hours: parseNonNegative(e.target.value) })
                         }
                         placeholder="0"
                         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
@@ -366,11 +394,70 @@ function SimulatePage() {
                         inputMode="numeric"
                         value={item.rate || ""}
                         onChange={(e) =>
-                          updateItem(item.id, { rate: Math.max(0, Number(e.target.value)) })
+                          updateItem(item.id, { rate: parseNonNegative(e.target.value) })
                         }
                         placeholder="Rp0"
                         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
                       />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Kompleksitas
+                      </span>
+                      <select
+                        value={item.complexity ?? DEFAULT_COMPLEXITY}
+                        onChange={(e) =>
+                          updateItem(item.id, {
+                            complexity: e.target.value as ComplexityLevel,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                      >
+                        {COMPLEXITY_LEVELS.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium text-muted-foreground">Pengalaman</span>
+                      <select
+                        value={item.experience ?? DEFAULT_EXPERIENCE}
+                        onChange={(e) =>
+                          updateItem(item.id, {
+                            experience: e.target.value as ExperienceLevel,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                      >
+                        {EXPERIENCE_LEVELS.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium text-muted-foreground">Revisi</span>
+                      <select
+                        value={revisionSelectValue(item.revisionCount)}
+                        onChange={(e) =>
+                          updateItem(item.id, {
+                            revisionCount: parseRevisionCount(e.target.value),
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                      >
+                        {REVISION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                   </div>
 
@@ -401,18 +488,12 @@ function SimulatePage() {
             ref={resultRef}
             className="mt-10 scroll-mt-40 animate-in fade-in slide-in-from-bottom-4 duration-500"
           >
-            <Results
-              projectName={projectName}
-              result={result}
-              onCopySummary={handleCopySummary}
-            />
+            <Results projectName={projectName} result={result} onCopySummary={handleCopySummary} />
           </div>
         )}
       </main>
 
-      {showResult && (
-        <ShareCardExportPortal cardRef={shareCardRef} data={shareCardData} />
-      )}
+      {showResult && <ShareCardExportPortal cardRef={shareCardRef} data={shareCardData} />}
 
       {/* CTA utama — melekat di bawah untuk penggunaan satu tangan */}
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/90 backdrop-blur-md">
@@ -515,14 +596,14 @@ function Results({
         <StatCard
           icon={<Clock className="h-4 w-4" />}
           label="Total jam"
-          value={`${result.totalHours.toLocaleString("id-ID")} Jam`}
-          hint={`Disarankan +${result.bufferHours} jam buffer · ideal ${result.idealHours.toLocaleString("id-ID")} Jam`}
+          value={formatHoursLabel(result.totalHours)}
+          hint={`Dasar ${formatHoursLabel(result.baseHours)} · disesuaikan ${formatHoursLabel(result.totalHours)}`}
         />
         <StatCard
           icon={<CalendarRange className="h-4 w-4" />}
           label="Estimasi durasi"
           value={result.durationLabel}
-          hint={`${result.totalHours.toLocaleString("id-ID")} jam kerja`}
+          hint={`${formatHoursLabel(result.totalHours)} kerja · ${result.workingDays} hari`}
         />
         <StatCard
           icon={<Wallet className="h-4 w-4" />}
@@ -531,6 +612,42 @@ function Results({
           hint={`Rata-rata ${formatMoney(result.averageRate)} per jam`}
           highlight
         />
+      </div>
+
+      {result.items.some((item) => item.baseHours > 0) && (
+        <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Jam dasar vs jam disesuaikan
+          </p>
+          <ul className="mt-3 space-y-2">
+            {result.items
+              .filter((item) => item.baseHours > 0)
+              .map((item) => (
+                <li key={item.id} className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate font-medium">
+                    {item.name.trim() || "Pekerjaan"}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatHoursLabel(item.baseHours)} → {formatHoursLabel(item.adjustedHours)}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Buffer
+        </p>
+        <p className="mt-2 font-display text-lg font-bold tracking-tight">
+          +{formatHoursLabel(result.bufferHours)} · ideal {formatHoursLabel(result.idealHours)}
+        </p>
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          {result.bufferReasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
       </div>
 
       <ProjectSummaryCard summary={result.projectSummary} onCopySummary={onCopySummary} />
