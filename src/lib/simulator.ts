@@ -8,6 +8,20 @@ export type RevisionCount = number | "unlimited";
 
 export type QualityLevel = "cukup" | "standar" | "tinggi";
 
+// Dimensi yang fleksibel pada sebuah proyek — hanya satu yang bisa dipilih,
+// dua lainnya dianggap kaku. Logika konflik dengan Baseline ditangani terpisah.
+export type FlexibleDimension = "scope" | "time" | "cost";
+
+export const FLEXIBLE_DIMENSIONS: FlexibleDimension[] = ["scope", "time", "cost"];
+
+export const FLEXIBLE_DIMENSION_LABELS: Record<FlexibleDimension, string> = {
+  scope: "Scope",
+  time: "Waktu",
+  cost: "Biaya",
+};
+
+export const DEFAULT_FLEXIBLE_DIMENSION: FlexibleDimension = "scope";
+
 export interface EstimateItem {
   id: string;
   name: string;
@@ -110,6 +124,9 @@ function resolveQuality(item: EstimateItem): QualityLevel {
   return item.quality && QUALITY_LEVELS.includes(item.quality) ? item.quality : DEFAULT_QUALITY;
 }
 
+// revisionCount 4 ke atas memetakan ke pengali revisi 3 (1,35) — UI hanya
+// menyediakan pilihan 0 sampai 3 plus Tak terbatas, jadi tidak ada tingkat
+// pengali tersendiri untuk 4+.
 function revisionMultiplier(revisionCount: EstimateItem["revisionCount"]): number {
   if (revisionCount === "unlimited") return REVISION_MULTIPLIERS.unlimited;
   const n = finiteNonNegative(revisionCount ?? DEFAULT_REVISION_COUNT);
