@@ -110,6 +110,9 @@ function resolveQuality(item: EstimateItem): QualityLevel {
   return item.quality && QUALITY_LEVELS.includes(item.quality) ? item.quality : DEFAULT_QUALITY;
 }
 
+// revisionCount 4 ke atas memetakan ke pengali revisi 3 (1,35) — UI hanya
+// menyediakan pilihan 0 sampai 3 plus Tak terbatas, jadi tidak ada tingkat
+// pengali tersendiri untuk 4+.
 function revisionMultiplier(revisionCount: EstimateItem["revisionCount"]): number {
   if (revisionCount === "unlimited") return REVISION_MULTIPLIERS.unlimited;
   const n = finiteNonNegative(revisionCount ?? DEFAULT_REVISION_COUNT);
