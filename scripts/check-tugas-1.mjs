@@ -6,13 +6,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const jiti = createJiti(root, { alias: { "@": join(root, "src") } });
 const sim = await jiti.import(join(root, "src/lib/simulator.ts"));
 
-const {
-  simulate,
-  adjustedHours,
-  formatDuration,
-  formatMoney,
-  itemCost,
-} = sim;
+const { simulate, adjustedHours, formatDuration, formatMoney, itemCost } = sim;
 
 const base = {
   id: "1",
@@ -60,7 +54,9 @@ let failed = 0;
 for (const [name, actual, expected] of checks) {
   const ok = Object.is(actual, expected);
   if (!ok) failed += 1;
-  console.log(`${ok ? "PASS" : "FAIL"} ${name}: ${JSON.stringify(actual)} (expected ${JSON.stringify(expected)})`);
+  console.log(
+    `${ok ? "PASS" : "FAIL"} ${name}: ${JSON.stringify(actual)} (expected ${JSON.stringify(expected)})`,
+  );
 }
 
 console.log("ex2 durationLabel", r2.durationLabel);
