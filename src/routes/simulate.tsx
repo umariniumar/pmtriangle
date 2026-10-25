@@ -19,11 +19,16 @@ import {
   COMPLEXITY_LEVELS,
   DEFAULT_COMPLEXITY,
   DEFAULT_EXPERIENCE,
+  DEFAULT_FLEXIBLE_DIMENSION,
+  DEFAULT_FOCUS_HOURS_PER_DAY,
   DEFAULT_REVISION_COUNT,
   EXPERIENCE_LEVELS,
+  FLEXIBLE_DIMENSIONS,
+  FLEXIBLE_DIMENSION_LABELS,
   type ComplexityLevel,
   type EstimateItem,
   type ExperienceLevel,
+  type FlexibleDimension,
   type RevisionCount,
   formatHoursLabel,
   formatMoney,
@@ -105,6 +110,11 @@ const PLACEHOLDER_EXAMPLES = [
 function SimulatePage() {
   const [projectName, setProjectName] = useState("");
   const [items, setItems] = useState<EstimateItem[]>([makeItem()]);
+  const [flexibleDimension, setFlexibleDimension] = useState<FlexibleDimension>(
+    DEFAULT_FLEXIBLE_DIMENSION,
+  );
+  const [focusHoursPerDay, setFocusHoursPerDay] = useState(DEFAULT_FOCUS_HOURS_PER_DAY);
+  const [deadlineDays, setDeadlineDays] = useState<number | undefined>(undefined);
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
@@ -118,7 +128,18 @@ function SimulatePage() {
   const canSimulate = projectName.trim().length > 0 && validItems.length > 0;
 
   // Kalkulasi langsung — diperbarui pada setiap ketikan, tanpa menunggu tombol.
-  const result = useMemo(() => simulate(items), [items]);
+  const result = useMemo(
+    () => simulate(items, { focusHoursPerDay, deadlineDays }),
+    [items, focusHoursPerDay, deadlineDays],
+  );
+
+  const rigidDimensionLabel = useMemo(
+    () =>
+      FLEXIBLE_DIMENSIONS.filter((dimension) => dimension !== flexibleDimension)
+        .map((dimension) => FLEXIBLE_DIMENSION_LABELS[dimension])
+        .join(" & "),
+    [flexibleDimension],
+  );
 
   // Placeholder contoh yang berganti untuk memberi inspirasi.
   useEffect(() => {
@@ -235,6 +256,9 @@ function SimulatePage() {
     nextId = 1;
     setProjectName("");
     setItems([makeItem()]);
+    setFlexibleDimension(DEFAULT_FLEXIBLE_DIMENSION);
+    setFocusHoursPerDay(DEFAULT_FOCUS_HOURS_PER_DAY);
+    setDeadlineDays(undefined);
     setShowResult(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -316,6 +340,77 @@ function SimulatePage() {
           <p className="mt-1 text-sm text-muted-foreground">
             {validItems.length} pekerjaan · {result.totalHours} jam
           </p>
+        </section>
+
+        {/* Pengaturan simulasi — dimensi fleksibel, jam fokus, dan deadline opsional */}
+        <section className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
+          <h2 className="text-sm font-semibold">Pengaturan Simulasi</h2>
+
+          <div className="mt-3">
+            <span className="text-xs font-medium text-muted-foreground">Mana yang fleksibel?</span>
+            <div className="mt-1.5 grid grid-cols-3 gap-2">
+              {FLEXIBLE_DIMENSIONS.map((dimension) => (
+                <button
+                  key={dimension}
+                  type="button"
+                  onClick={() => setFlexibleDimension(dimension)}
+                  className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                    flexibleDimension === dimension
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {FLEXIBLE_DIMENSION_LABELS[dimension]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Jam fokus per hari</span>
+              <span className="text-xs font-semibold">{focusHoursPerDay} jam</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              step={1}
+              value={focusHoursPerDay}
+              onChange={(e) => setFocusHoursPerDay(Number(e.target.value))}
+              className="mt-2 w-full accent-primary"
+              aria-label="Jam fokus per hari"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Bagaimana jika Anda hanya fokus {focusHoursPerDay} jam/hari?
+            </p>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-muted-foreground">
+              Deadline klien (opsional, hari kerja)
+            </span>
+            <input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={deadlineDays ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw.trim() === "") {
+                  setDeadlineDays(undefined);
+                  return;
+                }
+                const n = Number(raw);
+                setDeadlineDays(Number.isFinite(n) && n > 0 ? n : undefined);
+              }}
+              placeholder="Misal 5"
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+            />
+          </label>
         </section>
 
         {/* Daftar pekerjaan */}
@@ -488,7 +583,14 @@ function SimulatePage() {
             ref={resultRef}
             className="mt-10 scroll-mt-40 animate-in fade-in slide-in-from-bottom-4 duration-500"
           >
-            <Results projectName={projectName} result={result} onCopySummary={handleCopySummary} />
+            <Results
+              projectName={projectName}
+              result={result}
+              onCopySummary={handleCopySummary}
+              flexibleDimension={flexibleDimension}
+              rigidDimensionLabel={rigidDimensionLabel}
+              deadlineDays={deadlineDays}
+            />
           </div>
         )}
       </main>
@@ -578,11 +680,20 @@ function Results({
   projectName,
   result,
   onCopySummary,
+  flexibleDimension,
+  rigidDimensionLabel,
+  deadlineDays,
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
   onCopySummary: () => void;
+  flexibleDimension: FlexibleDimension;
+  rigidDimensionLabel: string;
+  deadlineDays?: number;
 }) {
+  const hasDeadline = typeof deadlineDays === "number" && deadlineDays > 0;
+  const isOverDeadline = hasDeadline && result.workingDays > deadlineDays;
+
   return (
     <div>
       <div className="mb-4">
@@ -590,6 +701,9 @@ function Results({
           Estimasi untuk
         </p>
         <h2 className="truncate text-xl font-bold">{projectName}</h2>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">
+          {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -613,6 +727,24 @@ function Results({
           highlight
         />
       </div>
+
+      {hasDeadline && (
+        <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Durasi vs deadline
+          </p>
+          <p className="mt-2 font-display text-lg font-bold tracking-tight">
+            {result.workingDays} hari kerja · deadline {deadlineDays} hari
+          </p>
+          <p
+            className={`mt-1 text-sm ${isOverDeadline ? "text-destructive" : "text-muted-foreground"}`}
+          >
+            {isOverDeadline
+              ? `Lebih lambat ${result.workingDays - deadlineDays} hari dari deadline.`
+              : "Estimasi masih sesuai atau lebih cepat dari deadline."}
+          </p>
+        </div>
+      )}
 
       {result.items.some((item) => item.baseHours > 0) && (
         <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">

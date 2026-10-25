@@ -8,6 +8,20 @@ export type RevisionCount = number | "unlimited";
 
 export type QualityLevel = "cukup" | "standar" | "tinggi";
 
+// Dimensi yang fleksibel pada sebuah proyek — hanya satu yang bisa dipilih,
+// dua lainnya dianggap kaku. Logika konflik dengan Baseline ditangani terpisah.
+export type FlexibleDimension = "scope" | "time" | "cost";
+
+export const FLEXIBLE_DIMENSIONS: FlexibleDimension[] = ["scope", "time", "cost"];
+
+export const FLEXIBLE_DIMENSION_LABELS: Record<FlexibleDimension, string> = {
+  scope: "Scope",
+  time: "Waktu",
+  cost: "Biaya",
+};
+
+export const DEFAULT_FLEXIBLE_DIMENSION: FlexibleDimension = "scope";
+
 export interface EstimateItem {
   id: string;
   name: string;
