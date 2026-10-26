@@ -4,7 +4,7 @@ import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
 import { EstimoLogo } from "@/components/estimo-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { trackCtaClicked, trackLandingView } from "@/lib/analytics";
-import { PRO_DURATION_DAYS, PRO_PRICE_RUPIAH } from "@/lib/pro";
+import { PRO_PRICE_RUPIAH } from "@/lib/pro";
 import { formatMoney } from "@/lib/simulator";
 
 export const Route = createFileRoute("/")({
@@ -83,8 +83,8 @@ function Landing() {
             />
             <FeatureCard
               icon={<Sparkles className="h-5 w-5" />}
-              title={`Pro ${formatMoney(PRO_PRICE_RUPIAH)}/${PRO_DURATION_DAYS} hari`}
-              body="Pengali kompleksitas & pengalaman, Baseline dan Change Log, Health Score, Risiko, Insight, plus Salin Ringkasan dan kartu Bagikan untuk klien."
+              title={`Pro ${formatMoney(PRO_PRICE_RUPIAH)} selamanya`}
+              body="Pengali kompleksitas & pengalaman, Baseline dan Change Log, Health Score, Risiko, Insight, plus Salin Ringkasan dan kartu Bagikan untuk klien. Sekali bayar, tanpa langganan."
             />
           </div>
         </section>

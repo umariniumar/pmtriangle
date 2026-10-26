@@ -60,7 +60,7 @@ import { formatClientShareText } from "@/lib/share-text";
 import { copyToClipboard } from "@/lib/share";
 import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
 import { bagikanProyek } from "@/lib/share-card-engine";
-import { formatProDate, useProStatus } from "@/lib/pro";
+import { useProStatus } from "@/lib/pro";
 import { ShareCardExportPortal } from "@/components/share-card/share-card-export-portal";
 import { AnimatedNumber } from "@/components/animated-number";
 import { EstimoLogo } from "@/components/estimo-logo";
@@ -203,8 +203,8 @@ function SimulatePage() {
 
   // Free hanya menghitung biaya dasar: pengali, jam fokus kustom, dan
   // deadline adalah fitur Pro. Memaksa nilai efektif ke default di sini
-  // (bukan di simulator.ts yang terkunci) menjaga data item Pro tetap utuh
-  // kalau Pro berakhir — hanya hasil hitungnya yang kembali ke dasar.
+  // (bukan di simulator.ts yang terkunci) menjaga data item apa adanya di
+  // state — hanya hasil hitungnya yang disederhanakan untuk Free.
   const effectiveItems = useMemo<EstimateItem[]>(
     () =>
       isPro
@@ -567,7 +567,7 @@ function SimulatePage() {
 
         {isPro && proRecord && (
           <div className="border-t border-border/60 bg-success/10 px-5 py-1.5 text-center text-xs font-semibold text-success">
-            Pro aktif sampai {formatProDate(proRecord.expiresAt)}
+            Pro aktif selamanya
           </div>
         )}
       </header>
@@ -649,6 +649,7 @@ function SimulatePage() {
               <input
                 type="number"
                 min={1}
+                step={1}
                 inputMode="numeric"
                 value={deadlineDays ?? ""}
                 onChange={(e) => {
@@ -658,7 +659,11 @@ function SimulatePage() {
                     return;
                   }
                   const n = Number(raw);
-                  handleDeadlineChange(Number.isFinite(n) && n > 0 ? n : undefined);
+                  // Deadline hanya bermakna sebagai hari kerja BULAT — pecahan
+                  // dibulatkan ke hari terdekat, dan nilai yang sudah
+                  // dibulatkan ditampilkan kembali di input (tidak ada nilai
+                  // pecahan yang tersimpan diam-diam).
+                  handleDeadlineChange(Number.isFinite(n) && n > 0 ? Math.round(n) : undefined);
                 }}
                 placeholder="Misal 5"
                 className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
@@ -1273,6 +1278,7 @@ function Results({
         riskLabel={isPro ? RISK_LABELS[result.riskLevel] : undefined}
         insight={isPro ? result.insight : undefined}
         onCopySummary={onCopySummary}
+        isPro={isPro}
       />
     </div>
   );

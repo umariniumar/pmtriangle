@@ -132,10 +132,15 @@ export interface BaselineConflict {
 }
 
 // Scope tidak punya satu angka tunggal di mesin ini, jadi dipakai total jam
-// dasar (sebelum pengali) sebagai proksi — berubah kalau pekerjaan
-// ditambah/dihapus atau jam dasarnya diubah.
-function baselineTotalBaseHours(baseline: BaselineSnapshot): number {
-  return baseline.items.reduce((sum, item) => sum + item.baseHours, 0);
+// DISESUAIKAN (bukan jam dasar) sebagai proksi — ini sengaja mencakup efek
+// pengali: menambah/menghapus pekerjaan, mengubah jam dasar, ATAU mengubah
+// kompleksitas/pengalaman/revisi semuanya mengubah berapa banyak pekerjaan
+// yang sebenarnya diminta, jadi semuanya dihitung sebagai pergeseran Scope.
+// (Tugas 7 — sebelumnya memakai jam dasar saja, sehingga perubahan
+// kompleksitas/revisi yang tidak mengubah jam dasar tidak pernah menandai
+// Scope meski jam disesuaikan dan biaya sudah bergeser.)
+function baselineTotalAdjustedHours(baseline: BaselineSnapshot): number {
+  return baseline.items.reduce((sum, item) => sum + item.adjustedHours, 0);
 }
 
 // Mendeteksi dimensi kaku (bukan dimensi fleksibel yang dipilih) yang
@@ -146,7 +151,7 @@ export function detectBaselineConflict(
   result: SimulationResult,
   flexibleDimension: FlexibleDimension,
 ): BaselineConflict {
-  const scopeMoved = result.baseHours !== baselineTotalBaseHours(baseline);
+  const scopeMoved = result.totalHours !== baselineTotalAdjustedHours(baseline);
   const timeMoved = result.workingDays !== baseline.workingDays;
   const costMoved = result.totalCost !== baseline.totalCost;
 

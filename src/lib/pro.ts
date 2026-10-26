@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 
-// ESTIMO Pro — sistem kehormatan v1 (Tugas 6).
+// ESTIMO Pro — sistem kehormatan v1 (Tugas 6), dikonversi ke sekali bayar
+// selamanya di Tugas 7 (diputuskan Umar 26 Okt 2026).
 //
 // Repo ini publik, jadi TIDAK ADA kata sandi, daftar kode rahasia, atau
 // logika "kode valid" tersembunyi di sini. Validasi di sini HANYA mengecek
 // FORMAT kode dan apakah tanggalnya kalender yang valid — bukan keasliannya.
 // Sumber kebenaran pembayaran adalah dashboard Mayar (admin memverifikasi
-// status Paid di sana), bukan kode ini. Tanggal YYYYMMDD di dalam kode hanya
-// label penelusuran admin di spreadsheet, BUKAN tanggal kedaluwarsa yang
-// dipaksakan ke masa Pro user — masa Pro selalu dihitung 30 hari sejak
-// AKTIVASI (kapan pun kode itu dimasukkan), tersimpan per perangkat.
-export const PRO_PRICE_RUPIAH = 20_000;
-export const PRO_DURATION_DAYS = 30;
+// status Paid di sana), bukan kode ini. Tanggal YYYYMMDD di dalam kode tetap
+// dipakai admin untuk penelusuran di spreadsheet (tanggal pembayaran/
+// penerbitan kode) — BUKAN tanggal kedaluwarsa. Sejak Tugas 7, Pro TIDAK
+// PERNAH kedaluwarsa: begitu ada record tersimpan, Pro aktif selamanya.
+export const PRO_PRICE_RUPIAH = 24_800;
 
 // Diputuskan Umar 26 Okt 2026 — jangan memakai nomor atau tautan lain.
+// PRO_PAYMENT_LINK_URL masih tautan lama (produk Mayar 30 hari); Umar sedang
+// mengubah produk Mayar-nya sendiri ke Rp24.800 selamanya di sisi Mayar.
+// Jangan mengarang URL baru di sini — ganti konstanta ini hanya kalau Umar
+// memberi URL Mayar yang baru.
 export const PRO_WHATSAPP_NUMBER = "0881082110248";
 export const PRO_PAYMENT_LINK_URL = "https://kodekoding.myr.id/pl/estimo-pro-30-hari";
 
@@ -21,8 +25,7 @@ const STORAGE_KEY = "estimo.pro.v1";
 
 export type ProRecord = {
   code: string;
-  activatedAt: string; // ISO — kapan kode ini diaktifkan di perangkat ini
-  expiresAt: string; // ISO — activatedAt + PRO_DURATION_DAYS
+  activatedAt: string; // ISO — kapan kode ini pertama diaktifkan di perangkat ini
 };
 
 export type ProState = {
@@ -51,14 +54,19 @@ export function isValidProCodeFormat(code: string): boolean {
   return isValidDateStamp(match[1]);
 }
 
+// Record lama dari model 30 hari (Tugas 6) masih punya field `expiresAt` di
+// localStorage sebagian user. Di sini field itu sengaja diabaikan — selama
+// `code` dan `activatedAt` ada, record itu sah dan Pro aktif selamanya. Ini
+// migrasi otomatis tanpa langkah tambahan: tidak ada user lama yang terkunci
+// hanya karena tanggal kedaluwarsa lamanya sudah lewat.
 function readRecord(): ProRecord | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ProRecord>;
-    if (!parsed.code || !parsed.activatedAt || !parsed.expiresAt) return null;
-    return parsed as ProRecord;
+    if (!parsed.code || !parsed.activatedAt) return null;
+    return { code: parsed.code, activatedAt: parsed.activatedAt };
   } catch {
     return null;
   }
@@ -73,29 +81,21 @@ function writeRecord(record: ProRecord): void {
   }
 }
 
+// Pro aktif selamanya begitu ada record tersimpan — tidak ada kedaluwarsa.
 export function isProActive(record: ProRecord | null): boolean {
-  if (!record) return false;
-  const expiry = new Date(record.expiresAt).getTime();
-  if (!Number.isFinite(expiry)) return false;
-  return Date.now() <= expiry;
+  return record !== null;
 }
 
-// Status Pro saat ini. Kalau tersimpan tapi sudah lewat tanggal kedaluwarsa,
-// otomatis dianggap Free — TANPA menghapus record atau data proyek apa pun,
-// hanya fitur Pro yang terkunci lagi. Record lama tetap disimpan supaya UI
-// bisa menunjukkan kapan masa Pro sebelumnya berakhir.
 export function getProState(): ProState {
   const record = readRecord();
   return { active: isProActive(record), record };
 }
 
-export type ActivateProResult =
-  { success: true; expiresAt: string } | { success: false; error: string };
+export type ActivateProResult = { success: true } | { success: false; error: string };
 
-// Kode yang SAMA bisa dipakai lagi — di perangkat baru, atau di perangkat
-// yang sama setelah masa Pro sebelumnya berakhir. Setiap aktivasi memberi
-// PRO_DURATION_DAYS hari baru dihitung dari SAAT INI (bukan dari tanggal di
-// dalam kode). Ini sistem kehormatan v1, bukan penegakan lintas perangkat.
+// Kode yang SAMA boleh dipakai lagi — di perangkat baru, atau di perangkat
+// yang sama kapan pun — karena ini hak pembeli lifetime, bukan perpanjangan
+// masa aktif. Sistem kehormatan v1, bukan penegakan lintas perangkat.
 export function activateProCode(rawCode: string): ActivateProResult {
   const code = rawCode.trim().toUpperCase();
 
@@ -106,39 +106,18 @@ export function activateProCode(rawCode: string): ActivateProResult {
     };
   }
 
-  const activatedAt = new Date();
-  const expires = new Date(activatedAt);
-  expires.setDate(expires.getDate() + PRO_DURATION_DAYS);
-
   const record: ProRecord = {
     code,
-    activatedAt: activatedAt.toISOString(),
-    expiresAt: expires.toISOString(),
+    activatedAt: new Date().toISOString(),
   };
   writeRecord(record);
 
-  return { success: true, expiresAt: record.expiresAt };
-}
-
-export function formatProDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-}
-
-// Pesan status untuk kasus "kode tersimpan tapi masa Pro-nya sudah lewat" —
-// ditulis jelas supaya tidak terbaca seolah KODE-nya yang kedaluwarsa,
-// padahal yang lewat adalah masa 30 hari yang tersimpan di perangkat ini.
-export function getExpiredNotice(state: ProState): string | null {
-  if (!state.record || state.active) return null;
-  return `Masa Pro Anda di perangkat ini berakhir pada ${formatProDate(
-    state.record.expiresAt,
-  )}. Masukkan kode unlock yang sama untuk mengaktifkan ${PRO_DURATION_DAYS} hari berikutnya.`;
+  return { success: true };
 }
 
 export function buildWhatsAppUnlockUrl(params: { buyerName?: string; orderId?: string }): string {
   const lines = [
-    "Halo, saya sudah bayar ESTIMO Pro 30 Hari dan ingin minta kode unlock.",
+    "Halo, saya sudah bayar ESTIMO Pro dan ingin minta kode unlock.",
     `Nama: ${params.buyerName?.trim() || "-"}`,
     `ID Order Mayar: ${params.orderId?.trim() || "-"}`,
   ];
@@ -148,11 +127,10 @@ export function buildWhatsAppUnlockUrl(params: { buyerName?: string; orderId?: s
 }
 
 // Hook ringan — satu sumber kebenaran status Pro untuk seluruh UI. Membaca
-// ulang saat tab kembali terlihat, localStorage berubah dari tab lain, atau
-// setiap satu menit selama sesi aktif — supaya masa Pro yang habis saat tab
-// masih terbuka ikut terdeteksi tanpa perlu reload paksa.
-const RECHECK_INTERVAL_MS = 60_000;
-
+// ulang saat tab kembali terlihat atau localStorage berubah dari tab lain,
+// supaya aktivasi di tab/sesi lain ikut terlihat tanpa reload paksa. Tidak
+// ada lagi re-check berkala — Pro lifetime tidak pernah berubah jadi Free
+// dengan sendirinya, jadi tidak ada kedaluwarsa yang perlu dipantau.
 export function useProStatus() {
   const [state, setState] = useState<ProState>(() => getProState());
 
@@ -166,11 +144,9 @@ export function useProStatus() {
     };
     window.addEventListener("storage", refresh);
     document.addEventListener("visibilitychange", onVisibility);
-    const intervalId = window.setInterval(refresh, RECHECK_INTERVAL_MS);
     return () => {
       window.removeEventListener("storage", refresh);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.clearInterval(intervalId);
     };
   }, [refresh]);
 

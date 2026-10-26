@@ -1,12 +1,9 @@
 import { useState } from "react";
 import { Check, MessageCircle, X } from "lucide-react";
 import {
-  PRO_DURATION_DAYS,
   PRO_PAYMENT_LINK_URL,
   PRO_PRICE_RUPIAH,
   buildWhatsAppUnlockUrl,
-  formatProDate,
-  getExpiredNotice,
   type ActivateProResult,
   type ProRecord,
 } from "@/lib/pro";
@@ -45,8 +42,6 @@ export function UpgradeModal({
 
   if (!open) return null;
 
-  const expiredNotice = getExpiredNotice({ active: isPro, record: proRecord });
-
   const handleActivate = () => {
     const result = onActivate(codeInput);
     if (!result.success) {
@@ -71,8 +66,10 @@ export function UpgradeModal({
           <div>
             <h2 className="text-lg font-bold">ESTIMO Pro</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatMoney(PRO_PRICE_RUPIAH)} sekali bayar · aktif {PRO_DURATION_DAYS} hari sejak
-              aktivasi pertama di perangkat ini.
+              {formatMoney(PRO_PRICE_RUPIAH)} sekali bayar, selamanya.
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Bukan langganan. Tidak ada tagihan otomatis. Tidak ada kedaluwarsa.
             </p>
           </div>
           <button
@@ -86,9 +83,15 @@ export function UpgradeModal({
         </div>
 
         {isPro && proRecord ? (
-          <div className="mt-4 rounded-xl border border-success/30 bg-success/10 p-3 text-sm font-semibold text-success">
-            Pro aktif sampai {formatProDate(proRecord.expiresAt)}.
-          </div>
+          <>
+            <div className="mt-4 rounded-xl border border-success/30 bg-success/10 p-3 text-sm font-semibold text-success">
+              Pro aktif selamanya.
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Ganti perangkat? Masukkan kode unlock yang sama lagi di perangkat baru itu — Pro aktif
+              lagi di sana, tanpa bayar ulang.
+            </p>
+          </>
         ) : (
           <>
             <ul className="mt-4 space-y-2 text-sm">
@@ -99,12 +102,6 @@ export function UpgradeModal({
                 </li>
               ))}
             </ul>
-
-            {expiredNotice && (
-              <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-foreground">
-                {expiredNotice}
-              </div>
-            )}
 
             <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
               <p className="text-sm font-semibold">Cara bayar (manual, via Mayar)</p>
@@ -181,7 +178,11 @@ export function UpgradeModal({
               <span className="text-xs font-medium text-muted-foreground">
                 Sudah punya kode unlock?
               </span>
-              <div className="mt-1 flex gap-2">
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Ganti perangkat atau install ulang? Masukkan kode yang sama lagi — Pro aktif lagi,
+                tanpa bayar ulang.
+              </p>
+              <div className="mt-1.5 flex gap-2">
                 <input
                   value={codeInput}
                   onChange={(e) => {
