@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Share2,
   Copy,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -59,11 +60,13 @@ import { formatClientShareText } from "@/lib/share-text";
 import { copyToClipboard } from "@/lib/share";
 import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
 import { bagikanProyek } from "@/lib/share-card-engine";
+import { formatProDate, useProStatus } from "@/lib/pro";
 import { ShareCardExportPortal } from "@/components/share-card/share-card-export-portal";
 import { AnimatedNumber } from "@/components/animated-number";
 import { EstimoLogo } from "@/components/estimo-logo";
 import { ProjectSummaryCard } from "@/components/project-summary-card";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 export const Route = createFileRoute("/simulate")({
   head: () => ({
@@ -184,19 +187,47 @@ function SimulatePage() {
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const simulationCompletedRef = useRef(false);
+
+  const { isPro, record: proRecord, activate: activatePro } = useProStatus();
 
   useSimulationAbandonTracking(simulationCompletedRef);
 
   const validItems = useMemo(() => items.filter((i) => i.hours > 0), [items]);
   const canSimulate = projectName.trim().length > 0 && validItems.length > 0;
 
+  const openUpgradeModal = () => setUpgradeModalOpen(true);
+
+  // Free hanya menghitung biaya dasar: pengali, jam fokus kustom, dan
+  // deadline adalah fitur Pro. Memaksa nilai efektif ke default di sini
+  // (bukan di simulator.ts yang terkunci) menjaga data item Pro tetap utuh
+  // kalau Pro berakhir — hanya hasil hitungnya yang kembali ke dasar.
+  const effectiveItems = useMemo<EstimateItem[]>(
+    () =>
+      isPro
+        ? items
+        : items.map((item) => ({
+            ...item,
+            complexity: DEFAULT_COMPLEXITY,
+            experience: DEFAULT_EXPERIENCE,
+            revisionCount: DEFAULT_REVISION_COUNT,
+          })),
+    [items, isPro],
+  );
+  const effectiveFocusHoursPerDay = isPro ? focusHoursPerDay : DEFAULT_FOCUS_HOURS_PER_DAY;
+  const effectiveDeadlineDays = isPro ? deadlineDays : undefined;
+
   // Kalkulasi langsung — diperbarui pada setiap ketikan, tanpa menunggu tombol.
   const result = useMemo(
-    () => simulate(items, { focusHoursPerDay, deadlineDays }),
-    [items, focusHoursPerDay, deadlineDays],
+    () =>
+      simulate(effectiveItems, {
+        focusHoursPerDay: effectiveFocusHoursPerDay,
+        deadlineDays: effectiveDeadlineDays,
+      }),
+    [effectiveItems, effectiveFocusHoursPerDay, effectiveDeadlineDays],
   );
 
   const rigidDimensionLabel = useMemo(
@@ -283,6 +314,7 @@ function SimulatePage() {
   };
 
   const handleFlexibleDimensionChange = (value: FlexibleDimension) => {
+    if (!isPro) return;
     if (value === flexibleDimension) return;
     if (baseline) {
       logChange(
@@ -296,6 +328,7 @@ function SimulatePage() {
   };
 
   const handleFocusHoursChange = (value: number) => {
+    if (!isPro) return;
     if (baseline) {
       const afterResult = simulate(items, { focusHoursPerDay: value, deadlineDays });
       logChange(
@@ -309,6 +342,7 @@ function SimulatePage() {
   };
 
   const handleDeadlineChange = (value: number | undefined) => {
+    if (!isPro) return;
     if (baseline) {
       const afterResult = simulate(items, { focusHoursPerDay, deadlineDays: value });
       const beforeLabel = deadlineDays ? `${deadlineDays} hari` : "tidak ada";
@@ -324,11 +358,13 @@ function SimulatePage() {
   };
 
   const handleLockBaseline = () => {
+    if (!isPro) return;
     setBaseline(createBaselineSnapshot(projectName, result, flexibleDimension, deadlineDays));
     setChangeLog([]);
   };
 
   const handleResetBaseline = () => {
+    if (!isPro) return;
     setBaseline(null);
     setChangeLog([]);
   };
@@ -409,6 +445,10 @@ function SimulatePage() {
   );
 
   const handleCopySummary = async () => {
+    if (!isPro) {
+      openUpgradeModal();
+      return;
+    }
     const copied = await copyToClipboard(formatClientShareText(shareInput));
     if (copied) {
       trackSummaryCopied("copy");
@@ -420,6 +460,10 @@ function SimulatePage() {
   };
 
   const handleShareResult = async () => {
+    if (!isPro) {
+      openUpgradeModal();
+      return;
+    }
     const cardElement = shareCardRef.current;
     if (!cardElement || isSharingCard) return;
 
@@ -520,6 +564,12 @@ function SimulatePage() {
             </div>
           </div>
         </div>
+
+        {isPro && proRecord && (
+          <div className="border-t border-border/60 bg-success/10 px-5 py-1.5 text-center text-xs font-semibold text-success">
+            Pro aktif sampai {formatProDate(proRecord.expiresAt)}
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-2xl px-5 pb-40 pt-6">
@@ -539,76 +589,98 @@ function SimulatePage() {
           </p>
         </section>
 
-        {/* Pengaturan simulasi — dimensi fleksibel, jam fokus, dan deadline opsional */}
-        <section className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
-          <h2 className="text-sm font-semibold">Pengaturan Simulasi</h2>
+        {/* Pengaturan simulasi — dimensi fleksibel, jam fokus, dan deadline opsional (Pro) */}
+        {isPro ? (
+          <section className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
+            <h2 className="text-sm font-semibold">Pengaturan Simulasi</h2>
 
-          <div className="mt-3">
-            <span className="text-xs font-medium text-muted-foreground">Mana yang fleksibel?</span>
-            <div className="mt-1.5 grid grid-cols-3 gap-2">
-              {FLEXIBLE_DIMENSIONS.map((dimension) => (
-                <button
-                  key={dimension}
-                  type="button"
-                  onClick={() => handleFlexibleDimensionChange(dimension)}
-                  className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
-                    flexibleDimension === dimension
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background text-muted-foreground hover:bg-accent"
-                  }`}
-                >
-                  {FLEXIBLE_DIMENSION_LABELS[dimension]}
-                </button>
-              ))}
+            <div className="mt-3">
+              <span className="text-xs font-medium text-muted-foreground">
+                Mana yang fleksibel?
+              </span>
+              <div className="mt-1.5 grid grid-cols-3 gap-2">
+                {FLEXIBLE_DIMENSIONS.map((dimension) => (
+                  <button
+                    key={dimension}
+                    type="button"
+                    onClick={() => handleFlexibleDimensionChange(dimension)}
+                    className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                      flexibleDimension === dimension
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {FLEXIBLE_DIMENSION_LABELS[dimension]}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel}{" "}
+                kaku
+              </p>
             </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
-            </p>
-          </div>
 
-          <div className="mt-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Jam fokus per hari</span>
-              <span className="text-xs font-semibold">{focusHoursPerDay} jam</span>
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Jam fokus per hari
+                </span>
+                <span className="text-xs font-semibold">{focusHoursPerDay} jam</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={8}
+                step={1}
+                value={focusHoursPerDay}
+                onChange={(e) => handleFocusHoursChange(Number(e.target.value))}
+                className="mt-2 w-full accent-primary"
+                aria-label="Jam fokus per hari"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Bagaimana jika Anda hanya fokus {focusHoursPerDay} jam/hari?
+              </p>
             </div>
-            <input
-              type="range"
-              min={1}
-              max={8}
-              step={1}
-              value={focusHoursPerDay}
-              onChange={(e) => handleFocusHoursChange(Number(e.target.value))}
-              className="mt-2 w-full accent-primary"
-              aria-label="Jam fokus per hari"
-            />
+
+            <label className="mt-4 block">
+              <span className="text-xs font-medium text-muted-foreground">
+                Deadline klien (opsional, hari kerja)
+              </span>
+              <input
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={deadlineDays ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw.trim() === "") {
+                    handleDeadlineChange(undefined);
+                    return;
+                  }
+                  const n = Number(raw);
+                  handleDeadlineChange(Number.isFinite(n) && n > 0 ? n : undefined);
+                }}
+                placeholder="Misal 5"
+                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+              />
+            </label>
+          </section>
+        ) : (
+          <section className="mt-4 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card sm:p-6">
+            <h2 className="text-sm font-semibold">Pengaturan Simulasi — Pro</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Bagaimana jika Anda hanya fokus {focusHoursPerDay} jam/hari?
+              Pemilih dimensi fleksibel, slider jam fokus per hari, dan deadline klien tersedia di
+              ESTIMO Pro.
             </p>
-          </div>
-
-          <label className="mt-4 block">
-            <span className="text-xs font-medium text-muted-foreground">
-              Deadline klien (opsional, hari kerja)
-            </span>
-            <input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={deadlineDays ?? ""}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw.trim() === "") {
-                  handleDeadlineChange(undefined);
-                  return;
-                }
-                const n = Number(raw);
-                handleDeadlineChange(Number.isFinite(n) && n > 0 ? n : undefined);
-              }}
-              placeholder="Misal 5"
-              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
-            />
-          </label>
-        </section>
+            <button
+              type="button"
+              onClick={openUpgradeModal}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+            >
+              Upgrade ke Pro
+            </button>
+          </section>
+        )}
 
         {/* Daftar pekerjaan */}
         <section className="mt-4">
@@ -694,71 +766,90 @@ function SimulatePage() {
                     </label>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <label className="block">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Kompleksitas
-                      </span>
-                      <select
-                        value={item.complexity ?? DEFAULT_COMPLEXITY}
-                        onChange={(e) =>
-                          updateItem(item.id, {
-                            complexity: e.target.value as ComplexityLevel,
-                          })
-                        }
-                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
-                      >
-                        {COMPLEXITY_LEVELS.map((level) => (
-                          <option key={level} value={level}>
-                            {level}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-muted-foreground">Pengalaman</span>
-                      <select
-                        value={item.experience ?? DEFAULT_EXPERIENCE}
-                        onChange={(e) =>
-                          updateItem(item.id, {
-                            experience: e.target.value as ExperienceLevel,
-                          })
-                        }
-                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
-                      >
-                        {EXPERIENCE_LEVELS.map((level) => (
-                          <option key={level} value={level}>
-                            {level}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="text-xs font-medium text-muted-foreground">Revisi</span>
-                      <select
-                        value={revisionSelectValue(item.revisionCount)}
-                        onChange={(e) =>
-                          updateItem(item.id, {
-                            revisionCount: parseRevisionCount(e.target.value),
-                          })
-                        }
-                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
-                      >
-                        {REVISION_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+                  {isPro ? (
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <label className="block">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Kompleksitas
+                        </span>
+                        <select
+                          value={item.complexity ?? DEFAULT_COMPLEXITY}
+                          onChange={(e) =>
+                            updateItem(item.id, {
+                              complexity: e.target.value as ComplexityLevel,
+                            })
+                          }
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                        >
+                          {COMPLEXITY_LEVELS.map((level) => (
+                            <option key={level} value={level}>
+                              {level}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Pengalaman
+                        </span>
+                        <select
+                          value={item.experience ?? DEFAULT_EXPERIENCE}
+                          onChange={(e) =>
+                            updateItem(item.id, {
+                              experience: e.target.value as ExperienceLevel,
+                            })
+                          }
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                        >
+                          {EXPERIENCE_LEVELS.map((level) => (
+                            <option key={level} value={level}>
+                              {level}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-medium text-muted-foreground">Revisi</span>
+                        <select
+                          value={revisionSelectValue(item.revisionCount)}
+                          onChange={(e) =>
+                            updateItem(item.id, {
+                              revisionCount: parseRevisionCount(e.target.value),
+                            })
+                          }
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                        >
+                          {REVISION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openUpgradeModal}
+                      className="mt-3 flex w-full items-center justify-between rounded-lg border border-dashed border-input px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      <span>Kompleksitas, pengalaman & revisi — Pro</span>
+                      <span className="font-semibold text-primary">Upgrade</span>
+                    </button>
+                  )}
 
                   <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
                     <span className="text-xs font-medium text-muted-foreground">
                       Estimasi biaya
                     </span>
                     <span className="font-display text-sm font-bold">
-                      {itemCost(item) > 0 ? formatMoney(itemCost(item)) : "—"}
+                      {isPro
+                        ? itemCost(item) > 0
+                          ? formatMoney(itemCost(item))
+                          : "—"
+                        : item.hours * item.rate > 0
+                          ? formatMoney(item.hours * item.rate)
+                          : "—"}
                     </span>
                   </div>
                 </div>
@@ -786,13 +877,15 @@ function SimulatePage() {
               onCopySummary={handleCopySummary}
               flexibleDimension={flexibleDimension}
               rigidDimensionLabel={rigidDimensionLabel}
-              deadlineDays={deadlineDays}
+              deadlineDays={effectiveDeadlineDays}
               baseline={baseline}
               changeLog={changeLog}
               baselineComparison={baselineComparison}
               baselineConflict={baselineConflict}
               onLockBaseline={handleLockBaseline}
               onResetBaseline={handleResetBaseline}
+              isPro={isPro}
+              onOpenUpgrade={openUpgradeModal}
             />
           </div>
         )}
@@ -817,17 +910,27 @@ function SimulatePage() {
                 onClick={handleCopySummary}
                 className="inline-flex flex-col items-center justify-center gap-1 rounded-xl bg-primary px-2 py-3 text-xs font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
               >
-                <Copy className="h-4 w-4 shrink-0" />
+                {isPro ? (
+                  <Copy className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Lock className="h-4 w-4 shrink-0" />
+                )}
                 <span className="leading-none sm:hidden">Salin</span>
-                <span className="hidden leading-none sm:inline">Salin Ringkasan</span>
+                <span className="hidden leading-none sm:inline">
+                  Salin Ringkasan{!isPro && " (Pro)"}
+                </span>
               </button>
               <button
                 onClick={handleShareResult}
                 disabled={isSharingCard}
                 className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
               >
-                <Share2 className="h-4 w-4 shrink-0" />
-                <span className="leading-none">Bagikan</span>
+                {isPro ? (
+                  <Share2 className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Lock className="h-4 w-4 shrink-0" />
+                )}
+                <span className="leading-none">Bagikan{!isPro && " (Pro)"}</span>
               </button>
             </div>
           ) : (
@@ -849,6 +952,14 @@ function SimulatePage() {
           )}
         </div>
       </div>
+
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        isPro={isPro}
+        proRecord={proRecord}
+        onActivate={activatePro}
+      />
     </div>
   );
 }
@@ -892,6 +1003,8 @@ function Results({
   baselineConflict,
   onLockBaseline,
   onResetBaseline,
+  isPro,
+  onOpenUpgrade,
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
@@ -905,6 +1018,8 @@ function Results({
   baselineConflict: BaselineConflict | null;
   onLockBaseline: () => void;
   onResetBaseline: () => void;
+  isPro: boolean;
+  onOpenUpgrade: () => void;
 }) {
   const hasDeadline = typeof deadlineDays === "number" && deadlineDays > 0;
   const isOverDeadline = hasDeadline && result.workingDays > deadlineDays;
@@ -919,12 +1034,14 @@ function Results({
           Estimasi untuk
         </p>
         <h2 className="truncate text-xl font-bold">{projectName}</h2>
-        <p className="mt-1 text-xs font-medium text-muted-foreground">
-          {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
-        </p>
+        {isPro && (
+          <p className="mt-1 text-xs font-medium text-muted-foreground">
+            {FLEXIBLE_DIMENSION_LABELS[flexibleDimension]} fleksibel · {rigidDimensionLabel} kaku
+          </p>
+        )}
       </div>
 
-      {!baseline && (
+      {isPro && !baseline && (
         <div className="mb-4 rounded-2xl border border-dashed border-primary/40 bg-accent/40 p-4">
           <p className="text-sm font-semibold">Kunci Baseline untuk melacak perubahan</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -941,7 +1058,7 @@ function Results({
         </div>
       )}
 
-      {hasConflict && baselineConflict && (
+      {isPro && hasConflict && baselineConflict && (
         <div className="mb-4 rounded-2xl border border-destructive/40 bg-destructive/10 p-4">
           <p className="text-sm font-semibold text-destructive">
             {baselineConflict.movedDimensions
@@ -961,7 +1078,7 @@ function Results({
         </div>
       )}
 
-      {baseline && baselineComparison && (
+      {isPro && baseline && baselineComparison && (
         <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-card">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1019,7 +1136,7 @@ function Results({
         </div>
       )}
 
-      {baseline && (
+      {isPro && baseline && (
         <div className="mb-4 rounded-2xl border border-border bg-card p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Change Log
@@ -1058,7 +1175,11 @@ function Results({
           icon={<Clock className="h-4 w-4" />}
           label="Total jam"
           value={formatHoursLabel(result.totalHours)}
-          hint={`Dasar ${formatHoursLabel(result.baseHours)} · disesuaikan ${formatHoursLabel(result.totalHours)}`}
+          hint={
+            isPro
+              ? `Dasar ${formatHoursLabel(result.baseHours)} · disesuaikan ${formatHoursLabel(result.totalHours)}`
+              : "Jam kerja yang Anda masukkan."
+          }
         />
         <StatCard
           icon={<CalendarRange className="h-4 w-4" />}
@@ -1075,7 +1196,7 @@ function Results({
         />
       </div>
 
-      {hasDeadline && (
+      {isPro && hasDeadline && (
         <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Durasi vs deadline
@@ -1093,7 +1214,7 @@ function Results({
         </div>
       )}
 
-      {result.items.some((item) => item.baseHours > 0) && (
+      {isPro && result.items.some((item) => item.baseHours > 0) && (
         <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Jam dasar vs jam disesuaikan
@@ -1115,25 +1236,42 @@ function Results({
         </div>
       )}
 
-      <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Buffer
-        </p>
-        <p className="mt-2 font-display text-lg font-bold tracking-tight">
-          +{formatHoursLabel(result.bufferHours)} · ideal {formatHoursLabel(result.idealHours)}
-        </p>
-        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-          {result.bufferReasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-      </div>
+      {isPro ? (
+        <div className="mt-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Buffer
+          </p>
+          <p className="mt-2 font-display text-lg font-bold tracking-tight">
+            +{formatHoursLabel(result.bufferHours)} · ideal {formatHoursLabel(result.idealHours)}
+          </p>
+          <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            {result.bufferReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card">
+          <p className="text-sm font-semibold">Baseline, Buffer, Health Score & Insight — Pro</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Kunci Baseline, lihat alasan buffer waktu, dan dapatkan Health Score dengan Insight
+            begitu Anda upgrade.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenUpgrade}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            Upgrade ke Pro
+          </button>
+        </div>
+      )}
 
       <ProjectSummaryCard
         summary={result.projectSummary}
-        health={result.health}
-        riskLabel={RISK_LABELS[result.riskLevel]}
-        insight={result.insight}
+        health={isPro ? result.health : undefined}
+        riskLabel={isPro ? RISK_LABELS[result.riskLevel] : undefined}
+        insight={isPro ? result.insight : undefined}
         onCopySummary={onCopySummary}
       />
     </div>
