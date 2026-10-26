@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Check, MessageCircle, X } from "lucide-react";
 import {
+  PRO_COMING_SOON,
   PRO_PAYMENT_LINK_URL,
   PRO_PRICE_RUPIAH,
+  buildWhatsAppInterestUrl,
   buildWhatsAppUnlockUrl,
   type ActivateProResult,
   type ProRecord,
@@ -53,6 +55,10 @@ export function UpgradeModal({
   };
 
   const whatsappUrl = buildWhatsAppUnlockUrl({ buyerName, orderId });
+  const whatsappInterestUrl = buildWhatsAppInterestUrl({
+    buyerName,
+    priceLabel: formatMoney(PRO_PRICE_RUPIAH),
+  });
 
   return (
     <div
@@ -71,6 +77,11 @@ export function UpgradeModal({
             <p className="mt-0.5 text-xs text-muted-foreground">
               Bukan langganan. Tidak ada tagihan otomatis. Tidak ada kedaluwarsa.
             </p>
+            {PRO_COMING_SOON && !isPro && (
+              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning-foreground">
+                Segera Hadir
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -103,72 +114,103 @@ export function UpgradeModal({
               ))}
             </ul>
 
-            <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
-              <p className="text-sm font-semibold">Cara bayar (manual, via Mayar)</p>
-              <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs text-muted-foreground">
-                <li>Klik tombol Bayar di bawah — tautan Mayar terbuka di tab baru.</li>
-                <li>
-                  Bayar {formatMoney(PRO_PRICE_RUPIAH)} di halaman checkout Mayar (nominal terkunci
-                  di Mayar; QRIS/virtual account/e-wallet/Alfamart sesuai yang diaktifkan).
-                </li>
-                <li>
-                  Setelah status Paid, kirim WhatsApp (tombol di bawah) menyertakan nama Anda dan ID
-                  order Mayar.
-                </li>
-                <li>
-                  Admin memverifikasi status Paid di dashboard Mayar (bukan hanya dari screenshot
-                  atau klaim WhatsApp), lalu mengirim satu kode unlock per pembayaran{" "}
-                  {formatMoney(PRO_PRICE_RUPIAH)} yang terverifikasi Paid.
-                </li>
-              </ol>
-
-              {PRO_PAYMENT_LINK_URL ? (
-                <a
-                  href={PRO_PAYMENT_LINK_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
-                >
-                  Bayar {formatMoney(PRO_PRICE_RUPIAH)} via Mayar
-                </a>
-              ) : (
-                <p className="mt-3 rounded-lg border border-dashed border-input p-3 text-xs text-muted-foreground">
-                  Tautan pembayaran belum tersedia. Hubungi admin lewat WhatsApp untuk instruksi
-                  pembayaran.
+            {PRO_COMING_SOON ? (
+              <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
+                <p className="text-sm font-semibold">ESTIMO Pro segera hadir</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Pembayaran sedang disiapkan, jadi Pro belum bisa dibeli hari ini. Daftar minat
+                  lewat WhatsApp — admin akan mengabari lewat WhatsApp begitu Pro sudah bisa dibeli,
+                  lalu Anda bayar {formatMoney(PRO_PRICE_RUPIAH)} dan menerima kode unlock.
                 </p>
-              )}
 
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
                   placeholder="Nama Anda (untuk pesan WhatsApp)"
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                  className="mt-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-xs outline-none transition-shadow focus:ring-2 focus:ring-ring"
                 />
-                <input
-                  value={orderId}
-                  onChange={(e) => setOrderId(e.target.value)}
-                  placeholder="ID Order Mayar (opsional)"
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs outline-none transition-shadow focus:ring-2 focus:ring-ring"
-                />
+
+                <a
+                  href={whatsappInterestUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Daftar Minat via WhatsApp
+                </a>
               </div>
+            ) : (
+              <>
+                <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold">Cara bayar (manual, via Mayar)</p>
+                  <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs text-muted-foreground">
+                    <li>Klik tombol Bayar di bawah — tautan Mayar terbuka di tab baru.</li>
+                    <li>
+                      Bayar {formatMoney(PRO_PRICE_RUPIAH)} di halaman checkout Mayar (nominal
+                      terkunci di Mayar; QRIS/virtual account/e-wallet/Alfamart sesuai yang
+                      diaktifkan).
+                    </li>
+                    <li>
+                      Setelah status Paid, kirim WhatsApp (tombol di bawah) menyertakan nama Anda
+                      dan ID order Mayar.
+                    </li>
+                    <li>
+                      Admin memverifikasi status Paid di dashboard Mayar (bukan hanya dari
+                      screenshot atau klaim WhatsApp), lalu mengirim satu kode unlock per pembayaran{" "}
+                      {formatMoney(PRO_PRICE_RUPIAH)} yang terverifikasi Paid.
+                    </li>
+                  </ol>
 
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Minta kode via WhatsApp
-              </a>
-            </div>
+                  {PRO_PAYMENT_LINK_URL ? (
+                    <a
+                      href={PRO_PAYMENT_LINK_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+                    >
+                      Bayar {formatMoney(PRO_PRICE_RUPIAH)} via Mayar
+                    </a>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-dashed border-input p-3 text-xs text-muted-foreground">
+                      Tautan pembayaran belum tersedia. Hubungi admin lewat WhatsApp untuk instruksi
+                      pembayaran.
+                    </p>
+                  )}
 
-            <p className="mt-3 text-xs text-muted-foreground">
-              Refund: pembayaran ganda atau salah dengan kode belum dikirim diselesaikan lewat
-              WhatsApp yang sama. Kode yang sudah dikirim dan dipakai tidak bisa direfund, kecuali
-              kesalahan admin.
-            </p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      value={buyerName}
+                      onChange={(e) => setBuyerName(e.target.value)}
+                      placeholder="Nama Anda (untuk pesan WhatsApp)"
+                      className="rounded-lg border border-input bg-background px-3 py-2 text-xs outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                    />
+                    <input
+                      value={orderId}
+                      onChange={(e) => setOrderId(e.target.value)}
+                      placeholder="ID Order Mayar (opsional)"
+                      className="rounded-lg border border-input bg-background px-3 py-2 text-xs outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Minta kode via WhatsApp
+                  </a>
+                </div>
+
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Refund: pembayaran ganda atau salah dengan kode belum dikirim diselesaikan lewat
+                  WhatsApp yang sama. Kode yang sudah dikirim dan dipakai tidak bisa direfund,
+                  kecuali kesalahan admin.
+                </p>
+              </>
+            )}
           </>
         )}
 
@@ -176,11 +218,12 @@ export function UpgradeModal({
           <div className="mt-5">
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">
-                Sudah punya kode unlock?
+                {PRO_COMING_SOON ? "Sudah dapat kode dari admin?" : "Sudah punya kode unlock?"}
               </span>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Ganti perangkat atau install ulang? Masukkan kode yang sama lagi — Pro aktif lagi,
-                tanpa bayar ulang.
+                {PRO_COMING_SOON
+                  ? "Kolom ini untuk kode yang sudah diberikan admin langsung (misalnya untuk pengujian atau pengguna awal) — bukan untuk membeli."
+                  : "Ganti perangkat atau install ulang? Masukkan kode yang sama lagi — Pro aktif lagi, tanpa bayar ulang."}
               </p>
               <div className="mt-1.5 flex gap-2">
                 <input
