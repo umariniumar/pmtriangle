@@ -1,4 +1,4 @@
-import type { ProjectScale } from "@/lib/project-summary";
+import type { HealthBand, ProjectScale } from "@/lib/project-summary";
 
 /** Warna hex untuk ekspor PNG — tidak memakai oklch agar html-to-image konsisten. */
 export const SHARE_CARD_SIZE = {
@@ -32,8 +32,19 @@ export const shareCardTheme = {
     besar: { bg: "#faf3e8", text: "#9a6b1a" },
     sangat_besar: { bg: "#fceceb", text: "#b83d32" },
   } satisfies Record<ProjectScale, { bg: string; text: string }>,
+  health: {
+    excellent: { bg: "#e8f5ef", text: "#1a7a55" },
+    healthy: { bg: "#e8f2ef", text: "#2d8a6a" },
+    warning: { bg: "#faf3e8", text: "#9a6b1a" },
+    critical: { bg: "#fceceb", text: "#b83d32" },
+    high_risk: { bg: "#fde2e1", text: "#9c2b22" },
+  } satisfies Record<HealthBand, { bg: string; text: string }>,
 } as const;
 
 export function getScaleColors(scale: ProjectScale) {
   return shareCardTheme.scale[scale];
+}
+
+export function getHealthBandColors(band: HealthBand) {
+  return shareCardTheme.health[band];
 }
