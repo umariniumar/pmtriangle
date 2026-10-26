@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Clock, Wallet, Sparkles } from "lucide-react";
 import { EstimoLogo } from "@/components/estimo-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import { trackCtaClicked, trackLandingView } from "@/lib/analytics";
-import { PRO_PRICE_RUPIAH } from "@/lib/pro";
+import { PRO_COMING_SOON, PRO_PRICE_RUPIAH, useProStatus } from "@/lib/pro";
 import { formatMoney } from "@/lib/simulator";
 
 export const Route = createFileRoute("/")({
@@ -12,6 +13,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { isPro, record, activate } = useProStatus();
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
   useEffect(() => {
     trackLandingView();
   }, []);
@@ -85,6 +89,8 @@ function Landing() {
               icon={<Sparkles className="h-5 w-5" />}
               title={`Pro ${formatMoney(PRO_PRICE_RUPIAH)} selamanya`}
               body="Pengali kompleksitas & pengalaman, Baseline dan Change Log, Health Score, Risiko, Insight, plus Salin Ringkasan dan kartu Bagikan untuk klien. Sekali bayar, tanpa langganan."
+              badge={PRO_COMING_SOON ? "Segera Hadir" : undefined}
+              onClick={() => setUpgradeModalOpen(true)}
             />
           </div>
         </section>
@@ -96,6 +102,14 @@ function Landing() {
           <p className="text-center text-xs text-muted-foreground">Kejelasan di atas kerumitan.</p>
         </div>
       </footer>
+
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        isPro={isPro}
+        proRecord={record}
+        onActivate={activate}
+      />
     </div>
   );
 }
@@ -104,18 +118,43 @@ function FeatureCard({
   icon,
   title,
   body,
+  badge,
+  onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   body: string;
+  badge?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+  const content = (
+    <>
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-foreground">
         {icon}
       </span>
-      <h3 className="mt-4 text-base font-semibold">{title}</h3>
+      <div className="mt-4 flex items-center gap-2">
+        <h3 className="text-base font-semibold">{title}</h3>
+        {badge && (
+          <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-semibold text-warning-foreground">
+            {badge}
+          </span>
+        )}
+      </div>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-2xl border border-border bg-card p-6 text-left shadow-soft transition-transform hover:-translate-y-0.5"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">{content}</div>;
 }

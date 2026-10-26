@@ -21,6 +21,16 @@ export const PRO_PRICE_RUPIAH = 24_800;
 export const PRO_WHATSAPP_NUMBER = "0881082110248";
 export const PRO_PAYMENT_LINK_URL = "https://kodekoding.myr.id/pl/estimo-pro-lifetime";
 
+// Flag rilis bertahap (keputusan Umar 26 Okt 2026) — SEMENTARA selama
+// verifikasi akun Mayar masih berjalan dan checkout Mayar belum aktif.
+// Saat true, modal Upgrade menyembunyikan tombol Bayar Mayar dan
+// menampilkan ajakan daftar minat via WhatsApp ("Segera Hadir") alih-alih.
+// Kode alur bayar Mayar TIDAK dihapus, hanya disembunyikan di balik flag
+// ini. Ubah menjadi `false` begitu verifikasi Mayar selesai dan checkout
+// Mayar aktif — itu saja yang perlu diubah untuk mengembalikan tombol
+// Bayar Mayar, tanpa menulis ulang modal.
+export const PRO_COMING_SOON = true;
+
 const STORAGE_KEY = "estimo.pro.v1";
 
 export type ProRecord = {
@@ -120,6 +130,23 @@ export function buildWhatsAppUnlockUrl(params: { buyerName?: string; orderId?: s
     "Halo, saya sudah bayar ESTIMO Pro dan ingin minta kode unlock.",
     `Nama: ${params.buyerName?.trim() || "-"}`,
     `ID Order Mayar: ${params.orderId?.trim() || "-"}`,
+  ];
+  const text = encodeURIComponent(lines.join("\n"));
+  const phone = PRO_WHATSAPP_NUMBER.replace(/^0/, "62");
+  return `https://wa.me/${phone}?text=${text}`;
+}
+
+// Pesan BERBEDA dari buildWhatsAppUnlockUrl di atas — khusus mode "Segera
+// Hadir" (lihat PRO_COMING_SOON). Pesan ini harus jelas bahwa pengguna
+// BELUM membayar dan hanya mendaftar minat, supaya admin tidak salah kira
+// pengguna sudah bayar lalu mengirim kode unlock begitu saja.
+export function buildWhatsAppInterestUrl(params: {
+  buyerName?: string;
+  priceLabel: string;
+}): string {
+  const lines = [
+    `Halo, saya berminat ESTIMO Pro selamanya ${params.priceLabel}. Kabari saya saat sudah bisa dibeli.`,
+    `Nama: ${params.buyerName?.trim() || "-"}`,
   ];
   const text = encodeURIComponent(lines.join("\n"));
   const phone = PRO_WHATSAPP_NUMBER.replace(/^0/, "62");
