@@ -1,4 +1,13 @@
-import { buildProjectSummary, type ProjectSummary } from "@/lib/project-summary";
+import {
+  buildHealthInsight,
+  buildProjectSummary,
+  calculateHealthScore,
+  calculateRiskLevel,
+  type HealthInput,
+  type HealthScore,
+  type ProjectSummary,
+  type RiskLevel,
+} from "@/lib/project-summary";
 
 export type ComplexityLevel = "Sangat Rendah" | "Rendah" | "Sedang" | "Tinggi" | "Sangat Tinggi";
 
@@ -54,7 +63,9 @@ export interface SimulationResult {
   averageRate: number;
   workingDays: number;
   durationLabel: string;
-  riskLevel: "low" | "moderate" | "high";
+  riskLevel: RiskLevel;
+  health: HealthScore;
+  insight: string;
   projectSummary: ProjectSummary;
   bufferHours: number;
   bufferReasons: string[];
@@ -122,6 +133,30 @@ function resolveExperience(item: EstimateItem): ExperienceLevel {
 
 function resolveQuality(item: EstimateItem): QualityLevel {
   return item.quality && QUALITY_LEVELS.includes(item.quality) ? item.quality : DEFAULT_QUALITY;
+}
+
+// Peringkat untuk mencari nilai TERBURUK per dimensi di seluruh pekerjaan,
+// dipakai Health Score & Risiko (Tugas 4) — bukan bagian dari rumus harga.
+const COMPLEXITY_RISK_RANK: Record<ComplexityLevel, number> = {
+  "Sangat Rendah": 0,
+  Rendah: 1,
+  Sedang: 2,
+  Tinggi: 3,
+  "Sangat Tinggi": 4,
+};
+
+const EXPERIENCE_RISK_RANK: Record<ExperienceLevel, number> = {
+  Ahli: 0,
+  Senior: 1,
+  Menengah: 2,
+  Junior: 3,
+  Pemula: 4,
+};
+
+function isWorseRevision(candidate: RevisionCount, current: RevisionCount): boolean {
+  if (candidate === "unlimited") return current !== "unlimited";
+  if (current === "unlimited") return false;
+  return candidate > current;
 }
 
 // revisionCount 4 ke atas memetakan ke pengali revisi 3 (1,35) — UI hanya
@@ -271,12 +306,44 @@ export function simulate(items: EstimateItem[], options: SimulateOptions = {}): 
   const idealHours = totalHours + bufferHours;
   const bufferReasons = collectBufferReasons(safeItems, workingDays, deadlineDays);
 
-  let riskLevel: SimulationResult["riskLevel"] = "low";
-  if (workingDays > 40) {
-    riskLevel = "high";
-  } else if (workingDays >= 10) {
-    riskLevel = "moderate";
+  // Nilai terburuk per dimensi di seluruh pekerjaan — dasar Health Score &
+  // Risiko (Tugas 4). Logika penalti dan ambang risiko ada di
+  // project-summary.ts, satu-satunya sumber kebenaran; di sini hanya
+  // ekstraksi "pekerjaan mana yang paling berisiko per dimensi".
+  let worstComplexity: ComplexityLevel = DEFAULT_COMPLEXITY;
+  let lowestExperience: ExperienceLevel = DEFAULT_EXPERIENCE;
+  let worstRevisionCount: RevisionCount = DEFAULT_REVISION_COUNT;
+
+  for (const item of safeItems) {
+    const complexity = resolveComplexity(item);
+    if (COMPLEXITY_RISK_RANK[complexity] > COMPLEXITY_RISK_RANK[worstComplexity]) {
+      worstComplexity = complexity;
+    }
+
+    const experience = resolveExperience(item);
+    if (EXPERIENCE_RISK_RANK[experience] > EXPERIENCE_RISK_RANK[lowestExperience]) {
+      lowestExperience = experience;
+    }
+
+    const effectiveRevision: RevisionCount =
+      item.revisionCount === "unlimited"
+        ? "unlimited"
+        : finiteNonNegative(item.revisionCount ?? DEFAULT_REVISION_COUNT);
+    if (isWorseRevision(effectiveRevision, worstRevisionCount)) {
+      worstRevisionCount = effectiveRevision;
+    }
   }
+
+  const healthInput: HealthInput = {
+    worstComplexity,
+    worstRevisionCount,
+    lowestExperience,
+    workingDays,
+    deadlineDays,
+  };
+  const health = calculateHealthScore(healthInput);
+  const riskLevel = calculateRiskLevel(healthInput, health);
+  const insight = buildHealthInsight(healthInput, health);
 
   return {
     totalHours,
@@ -286,6 +353,8 @@ export function simulate(items: EstimateItem[], options: SimulateOptions = {}): 
     workingDays,
     durationLabel: formatDuration(totalHours, focusHoursPerDay),
     riskLevel,
+    health,
+    insight,
     projectSummary: buildProjectSummary({
       totalHours,
       workingDays,
