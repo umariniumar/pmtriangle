@@ -356,24 +356,56 @@ function SimulatePage() {
 
   const shareCardData = useMemo(
     () =>
-      buildShareCardData(
+      buildShareCardData({
         projectName,
-        result.projectSummary,
-        result.durationLabel,
-        result.totalCost,
-      ),
-    [projectName, result],
+        result,
+        riskLabel: RISK_LABELS[result.riskLevel],
+        baseline: baseline ?? undefined,
+        comparison: baselineComparison ?? undefined,
+      }),
+    [projectName, result, baseline, baselineComparison],
   );
 
   const shareInput = useMemo(
     () => ({
       projectName,
       durationLabel: result.durationLabel,
+      workingDays: result.workingDays,
       totalCost: result.totalCost,
       scaleLabel: result.projectSummary.scaleLabel,
       recommendation: result.projectSummary.recommendation,
+      items: result.items
+        .filter((item) => item.baseHours > 0)
+        .map((item) => ({
+          name: item.name,
+          baseHours: item.baseHours,
+          adjustedHours: item.adjustedHours,
+        })),
+      baseline: baseline
+        ? {
+            totalCost: baseline.totalCost,
+            durationLabel: baseline.durationLabel,
+            workingDays: baseline.workingDays,
+          }
+        : undefined,
+      comparison: baselineComparison ?? undefined,
+      healthScore: result.health.score,
+      healthBandLabel: result.health.bandLabel,
+      riskLabel: RISK_LABELS[result.riskLevel],
+      insight: result.insight,
+      flexibleDimensionLabel: FLEXIBLE_DIMENSION_LABELS[flexibleDimension],
+      focusHoursPerDay,
+      deadlineDays,
     }),
-    [projectName, result],
+    [
+      projectName,
+      result,
+      baseline,
+      baselineComparison,
+      flexibleDimension,
+      focusHoursPerDay,
+      deadlineDays,
+    ],
   );
 
   const handleCopySummary = async () => {
