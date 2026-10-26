@@ -13,13 +13,13 @@ import { useCallback, useEffect, useState } from "react";
 // PERNAH kedaluwarsa: begitu ada record tersimpan, Pro aktif selamanya.
 export const PRO_PRICE_RUPIAH = 24_800;
 
-// Diputuskan Umar 26 Okt 2026 — jangan memakai nomor atau tautan lain.
-// PRO_PAYMENT_LINK_URL masih tautan lama (produk Mayar 30 hari); Umar sedang
-// mengubah produk Mayar-nya sendiri ke Rp24.800 selamanya di sisi Mayar.
-// Jangan mengarang URL baru di sini — ganti konstanta ini hanya kalau Umar
-// memberi URL Mayar yang baru.
+// Nomor WhatsApp admin dan tautan Mayar di bawah ini sudah diputuskan Umar —
+// jangan memakai nomor atau tautan lain, dan jangan mengarang URL baru di
+// sini. Ganti konstanta ini hanya kalau Umar memberi nilai baru.
+// PRO_PAYMENT_LINK_URL: Mayar Link Pembayaran ESTIMO Pro selamanya Rp24.800,
+// diputuskan 26 Okt 2026.
 export const PRO_WHATSAPP_NUMBER = "0881082110248";
-export const PRO_PAYMENT_LINK_URL = "https://kodekoding.myr.id/pl/estimo-pro-30-hari";
+export const PRO_PAYMENT_LINK_URL = "https://kodekoding.myr.id/pl/estimo-pro-lifetime";
 
 const STORAGE_KEY = "estimo.pro.v1";
 
