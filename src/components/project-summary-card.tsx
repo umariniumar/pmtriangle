@@ -1,4 +1,4 @@
-import { ClipboardList, Copy } from "lucide-react";
+import { ClipboardList, Copy, Lock } from "lucide-react";
 import type { HealthScore, ProjectSummary } from "@/lib/project-summary";
 
 type SummaryRow = {
@@ -12,12 +12,15 @@ export function ProjectSummaryCard({
   riskLabel,
   insight,
   onCopySummary,
+  isPro = true,
 }: {
   summary: ProjectSummary;
   health?: HealthScore;
   riskLabel?: string;
   insight?: string;
   onCopySummary?: () => void;
+  // Default true supaya pemanggil lama (tanpa gating Pro) tidak perlu berubah.
+  isPro?: boolean;
 }) {
   const rows: SummaryRow[] = [
     {
@@ -50,8 +53,8 @@ export function ProjectSummaryCard({
             onClick={onCopySummary}
             className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <Copy className="h-3.5 w-3.5" />
-            Salin
+            {isPro ? <Copy className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+            Salin{!isPro && " (Pro)"}
           </button>
         )}
       </div>

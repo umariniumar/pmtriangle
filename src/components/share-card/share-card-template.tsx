@@ -6,7 +6,7 @@ import {
   SHARE_CARD_SIZE,
   shareCardTheme,
 } from "@/lib/share-card-theme";
-import { formatMoney } from "@/lib/simulator";
+import { formatHoursLabel, formatMoney } from "@/lib/simulator";
 
 type ShareCardTemplateProps = {
   data: ShareCardData;
@@ -226,10 +226,10 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardTemplatePro
                 </div>
               </div>
               <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <DeltaChip label="jam" value={data.comparison.hoursDelta} unit="jam" />
-                <DeltaChip label="biaya" value={data.comparison.costDelta} unit="rupiah" />
+                <DeltaChip label="Jam" value={data.comparison.hoursDelta} unit="jam" />
+                <DeltaChip label="Biaya" value={data.comparison.costDelta} unit="rupiah" />
                 <DeltaChip
-                  label="hari kerja"
+                  label="Hari kerja"
                   value={data.comparison.workingDaysDelta}
                   unit="hari"
                 />
@@ -399,12 +399,15 @@ function DeltaChip({
 
   const sign = value > 0 ? "+" : "−";
   const magnitude = Math.abs(value);
+  // "jam" memakai formatHoursLabel yang sama dengan layar — bukan template
+  // literal mentah — supaya delta pecahan (mis. 21,75) memakai koma Indonesia
+  // seperti di layar, bukan titik desimal bawaan JavaScript (21.75).
   const formatted =
     unit === "rupiah"
       ? formatMoney(magnitude)
       : unit === "hari"
         ? `${magnitude} hari kerja`
-        : `${magnitude} jam`;
+        : formatHoursLabel(magnitude);
 
   return (
     <span
