@@ -119,8 +119,9 @@ function revisionLabel(revisionCount: RevisionCount | undefined): string {
 
 const RISK_LABELS: Record<SimulationResult["riskLevel"], string> = {
   low: "Rendah",
-  moderate: "Sedang",
+  medium: "Sedang",
   high: "Tinggi",
+  critical: "Kritis",
 };
 
 // Field pada EstimateItem yang perubahannya dicatat di Change Log. Nama
@@ -1096,7 +1097,13 @@ function Results({
         </ul>
       </div>
 
-      <ProjectSummaryCard summary={result.projectSummary} onCopySummary={onCopySummary} />
+      <ProjectSummaryCard
+        summary={result.projectSummary}
+        health={result.health}
+        riskLabel={RISK_LABELS[result.riskLevel]}
+        insight={result.insight}
+        onCopySummary={onCopySummary}
+      />
     </div>
   );
 }

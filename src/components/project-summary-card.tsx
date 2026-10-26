@@ -1,5 +1,5 @@
 import { ClipboardList, Copy } from "lucide-react";
-import type { ProjectSummary } from "@/lib/project-summary";
+import type { HealthScore, ProjectSummary } from "@/lib/project-summary";
 
 type SummaryRow = {
   label: string;
@@ -8,9 +8,15 @@ type SummaryRow = {
 
 export function ProjectSummaryCard({
   summary,
+  health,
+  riskLabel,
+  insight,
   onCopySummary,
 }: {
   summary: ProjectSummary;
+  health?: HealthScore;
+  riskLabel?: string;
+  insight?: string;
   onCopySummary?: () => void;
 }) {
   const rows: SummaryRow[] = [
@@ -50,9 +56,49 @@ export function ProjectSummaryCard({
         )}
       </div>
 
+      {health && (
+        <div className="mt-4 rounded-xl border border-border/60 bg-muted/40 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Health Score</p>
+              <p className="mt-0.5 font-display text-2xl font-bold tracking-tight">
+                {health.score}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${health.bandChipClass}`}
+              >
+                {health.bandLabel}
+              </span>
+              {riskLabel && (
+                <span className="text-xs text-muted-foreground">Risiko: {riskLabel}</span>
+              )}
+            </div>
+          </div>
+
+          {insight && <p className="mt-3 text-sm font-semibold leading-snug">{insight}</p>}
+
+          <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+            {health.penalties.length === 0 ? (
+              <li>Tidak ada penalti.</li>
+            ) : (
+              health.penalties.map((penalty, index) => (
+                <li key={`${penalty.kind}-${index}`}>
+                  −{penalty.amount}: {penalty.reason}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+
       <dl className="mt-4 space-y-3">
         {rows.map(({ label, value }) => (
-          <div key={label} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div
+            key={label}
+            className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+          >
             <dt className="shrink-0 text-xs font-medium text-muted-foreground">{label}</dt>
             <dd className="text-sm font-semibold leading-snug text-foreground sm:max-w-[65%] sm:text-right">
               {value}
