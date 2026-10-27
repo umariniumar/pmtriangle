@@ -17,7 +17,7 @@ import { formatMoney } from "@/lib/simulator";
 const PRO_FEATURES = [
   "Pilih sisi yang fleksibel antara Scope, Waktu, atau Biaya — dua sisi lainnya tetap kaku, dan ESTIMO menandai jika angka awal yang sudah dikunci (Baseline) ikut bergeser",
   "Pengali Kompleksitas, Pengalaman, dan Revisi — jam dasar vs jam disesuaikan",
-  "Atur jam fokus kerja per hari dan masukkan deadline dari klien",
+  "Atur jam fokus kerja per hari",
   "Baseline, Change Log, dan perbandingan Baseline vs Skenario",
   "Buffer waktu ekstra, beserta alasan kenapa buffer itu disarankan",
   "Health Score, Risiko, dan Insight",
