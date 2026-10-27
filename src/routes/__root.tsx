@@ -102,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Perkirakan durasi dan biaya proyek sebelum mulai. Tambahkan pekerjaan, klik simulasikan, dapatkan insight.",
+          "ESTIMO membantu siapa saja menghitung estimasi biaya proyek lepas dengan metode Triple Constraint: simulasikan Scope, Time, dan Cost sebelum memutuskan harga.",
       },
       { property: "og:type", content: "website" },
       ...(appUrl ? [{ property: "og:url", content: appUrl }] : []),
@@ -111,7 +111,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "Perkirakan durasi dan biaya proyek sebelum mulai. Tambahkan pekerjaan, klik simulasikan, dapatkan insight.",
+          "ESTIMO membantu siapa saja menghitung estimasi biaya proyek lepas dengan metode Triple Constraint: simulasikan Scope, Time, dan Cost sebelum memutuskan harga.",
       },
       { property: "og:image", content: ogImageUrl },
       { name: "twitter:image", content: ogImageUrl },
