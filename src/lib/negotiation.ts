@@ -362,10 +362,18 @@ export function buildNegotiationPlans(input: NegotiationInput): NegotiationPlans
   return plans;
 }
 
-// Bagian 5.6 — percobaan Free dipakai hanya kalau cabang yang BENAR-BENAR
-// ditampilkan (bukan yang tidak lengkap datanya) semuanya final — tidak ada
-// yang masih menunggu Ro. Cabang 1 tidak pernah butuh Ro, jadi selalu final.
+// Bagian 5.6 — percobaan Free dipakai HANYA kalau minimal satu dari Cabang
+// 2 (deadline), Cabang 3 (budget), atau Cabang 4 (deadline + budget)
+// benar-benar tampil (Dc/Bc tidak kosong) DAN semua cabang yang tampil di
+// antara ketiganya sudah final — tidak ada yang masih menunggu Ro. Kalau Dc
+// dan Bc masih kosong, hanya Cabang 1 yang tampil (selalu final karena tidak
+// pernah butuh Ro), dan itu TIDAK BOLEH memakan percobaan — bukan sekadar
+// "tidak ada yang pending", tapi harus ada cabang nego yang benar-benar
+// dihasilkan dari data klien. Cabang 3 tidak pernah punya status pending
+// (tidak pernah butuh Ro), jadi begitu dia tampil, dia otomatis final.
 export function allShownPlansFinal(plans: NegotiationPlans): boolean {
+  const hasClientDataPlan = Boolean(plans.deadline || plans.budget || plans.deadlineAndBudget);
+  if (!hasClientDataPlan) return false;
   if (plans.deadline && plans.deadline.split.totalCost === null) return false;
   if (plans.deadlineAndBudget && plans.deadlineAndBudget.pending) return false;
   return true;
