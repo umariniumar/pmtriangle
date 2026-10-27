@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Plus,
@@ -167,12 +167,7 @@ function describeItemChange(
   }
 }
 
-const PLACEHOLDER_EXAMPLES = [
-  "Website Company Profile",
-  "Landing Page",
-  "Aplikasi POS",
-  "Logo Brand",
-];
+const PROJECT_NAME_PLACEHOLDER = "Contoh: Website Company Profile";
 
 function SimulatePage() {
   const [projectName, setProjectName] = useState("");
@@ -186,7 +181,6 @@ function SimulatePage() {
   const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
-  const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
@@ -259,15 +253,6 @@ function SimulatePage() {
     if (!baseline) return;
     setChangeLog((prev) => [createChangeLogEntry(field, description, before, after), ...prev]);
   };
-
-  // Placeholder contoh yang berganti untuk memberi inspirasi.
-  useEffect(() => {
-    const id = setInterval(
-      () => setPlaceholderIdx((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length),
-      2600,
-    );
-    return () => clearInterval(id);
-  }, []);
 
   const updateItem = (id: string, patch: Partial<EstimateItem>) => {
     const before = items.find((i) => i.id === id);
@@ -559,7 +544,6 @@ function SimulatePage() {
                     "—"
                   )
                 }
-                highlight
               />
             </div>
           </div>
@@ -576,12 +560,12 @@ function SimulatePage() {
         {/* Header proyek yang ringkas */}
         <section className="rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {projectName.trim().length === 0 ? "✨ Proyek Baru" : "Nama proyek"}
+            Nama Proyek
           </span>
           <input
             value={projectName}
             onChange={(e) => setName(e.target.value)}
-            placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
+            placeholder={PROJECT_NAME_PLACEHOLDER}
             className="mt-1 w-full bg-transparent text-lg font-bold tracking-tight outline-none placeholder:font-semibold placeholder:text-muted-foreground/50 sm:text-xl"
           />
           <p className="mt-1 text-sm text-muted-foreground">
@@ -674,8 +658,8 @@ function SimulatePage() {
           <section className="mt-4 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card sm:p-6">
             <h2 className="text-sm font-semibold">Pengaturan Simulasi — Pro</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pemilih dimensi fleksibel, slider jam fokus per hari, dan deadline klien tersedia di
-              ESTIMO Pro.
+              Pilih sisi yang fleksibel antara Scope, Waktu, atau Biaya, atur jam fokus kerja per
+              hari, dan masukkan deadline dari klien — semua tersedia di ESTIMO Pro.
             </p>
             <button
               type="button"
@@ -692,7 +676,7 @@ function SimulatePage() {
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="text-sm font-semibold">Daftar Pekerjaan</h2>
             {items.length > 0 && (
-              <span className="text-xs text-muted-foreground">{validItems.length} dihitung</span>
+              <span className="text-xs text-muted-foreground">{validItems.length} pekerjaan</span>
             )}
           </div>
 
@@ -729,7 +713,7 @@ function SimulatePage() {
                     />
                     <button
                       onClick={() => removeItem(item.id)}
-                      aria-label="Hapus pekerjaan"
+                      aria-label="Hapus Pekerjaan"
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -768,6 +752,11 @@ function SimulatePage() {
                         placeholder="Rp0"
                         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
                       />
+                      {item.rate > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatMoney(item.rate)}
+                        </p>
+                      )}
                     </label>
                   </div>
 
@@ -833,14 +822,18 @@ function SimulatePage() {
                       </label>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={openUpgradeModal}
-                      className="mt-3 flex w-full items-center justify-between rounded-lg border border-dashed border-input px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                    >
-                      <span>Kompleksitas, pengalaman & revisi — Pro</span>
-                      <span className="font-semibold text-primary">Upgrade</span>
-                    </button>
+                    <div className="mt-3 rounded-lg border border-dashed border-primary/40 bg-accent/30 p-3 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        Kompleksitas, Pengalaman, dan Revisi tersedia di ESTIMO Pro.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openUpgradeModal}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+                      >
+                        Upgrade ke Pro
+                      </button>
+                    </div>
                   )}
 
                   <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
@@ -879,7 +872,6 @@ function SimulatePage() {
             <Results
               projectName={projectName}
               result={result}
-              onCopySummary={handleCopySummary}
               flexibleDimension={flexibleDimension}
               rigidDimensionLabel={rigidDimensionLabel}
               deadlineDays={effectiveDeadlineDays}
@@ -913,7 +905,7 @@ function SimulatePage() {
               </button>
               <button
                 onClick={handleCopySummary}
-                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl bg-primary px-2 py-3 text-xs font-semibold text-primary-foreground shadow-focus transition-transform hover:-translate-y-0.5 sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-input bg-background px-2 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
               >
                 {isPro ? (
                   <Copy className="h-4 w-4 shrink-0" />
@@ -950,7 +942,8 @@ function SimulatePage() {
               </button>
               {!canSimulate && (
                 <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Isi nama proyek dan minimal satu pekerjaan dengan jam untuk menyimulasikan.
+                  Isi nama proyek dan tambahkan minimal satu pekerjaan dengan estimasi jam untuk
+                  mulai simulasi.
                 </p>
               )}
             </>
@@ -973,19 +966,13 @@ function SummaryStat({
   icon,
   label,
   value,
-  highlight,
 }: {
   icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
-  highlight?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-xl border px-3 py-2 ${
-        highlight ? "border-primary/30 bg-accent" : "border-border bg-card"
-      }`}
-    >
+    <div className="rounded-xl border border-border bg-card px-3 py-2">
       <div className="flex items-center gap-1 text-muted-foreground">
         {icon}
         <span className="text-[0.7rem] font-medium">{label}</span>
@@ -998,7 +985,6 @@ function SummaryStat({
 function Results({
   projectName,
   result,
-  onCopySummary,
   flexibleDimension,
   rigidDimensionLabel,
   deadlineDays,
@@ -1013,7 +999,6 @@ function Results({
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
-  onCopySummary: () => void;
   flexibleDimension: FlexibleDimension;
   rigidDimensionLabel: string;
   deadlineDays?: number;
@@ -1188,16 +1173,15 @@ function Results({
         />
         <StatCard
           icon={<CalendarRange className="h-4 w-4" />}
-          label="Estimasi durasi"
+          label="Durasi"
           value={result.durationLabel}
-          hint={`${formatHoursLabel(result.totalHours)} kerja · ${result.workingDays} hari`}
+          hint={`${formatHoursLabel(result.totalHours)} kerja · ${result.workingDays} Hari`}
         />
         <StatCard
           icon={<Wallet className="h-4 w-4" />}
-          label="Estimasi biaya"
+          label="Biaya"
           value={formatMoney(result.totalCost)}
           hint={`Rata-rata ${formatMoney(result.averageRate)} per jam`}
-          highlight
         />
       </div>
 
@@ -1257,10 +1241,10 @@ function Results({
         </div>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card">
-          <p className="text-sm font-semibold">Baseline, Buffer, Health Score & Insight — Pro</p>
+          <p className="text-sm font-semibold">Baseline, Buffer, Health Score, dan Insight — Pro</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Kunci Baseline, lihat alasan buffer waktu, dan dapatkan Health Score dengan Insight
-            begitu Anda upgrade.
+            Kunci Baseline untuk melacak perubahan, lihat alasan di balik buffer waktu yang
+            disarankan, dan dapatkan Health Score beserta Insight untuk proyek ini.
           </p>
           <button
             type="button"
@@ -1277,8 +1261,6 @@ function Results({
         health={isPro ? result.health : undefined}
         riskLabel={isPro ? RISK_LABELS[result.riskLevel] : undefined}
         insight={isPro ? result.insight : undefined}
-        onCopySummary={onCopySummary}
-        isPro={isPro}
       />
     </div>
   );
@@ -1316,20 +1298,14 @@ function StatCard({
   label,
   value,
   hint,
-  highlight,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   hint: string;
-  highlight?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-2xl border p-5 shadow-card ${
-        highlight ? "border-primary/30 bg-accent" : "border-border bg-card"
-      }`}
-    >
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
         <span className="text-xs font-medium">{label}</span>

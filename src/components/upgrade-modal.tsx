@@ -15,11 +15,11 @@ import { formatMoney } from "@/lib/simulator";
 // riwayat lokal permanen, Innovation Log, PDF, tautan permanen, template,
 // atau mode tim di sini, karena belum ada.
 const PRO_FEATURES = [
-  "Pemilih fleksibel (Scope / Waktu / Biaya) dan deteksi konflik dengan Baseline",
+  "Pilih sisi yang fleksibel antara Scope, Waktu, atau Biaya — dua sisi lainnya tetap kaku, dan ESTIMO menandai jika angka awal yang sudah dikunci (Baseline) ikut bergeser",
   "Pengali Kompleksitas, Pengalaman, dan Revisi — jam dasar vs jam disesuaikan",
-  "Slider jam fokus per hari dan input deadline klien",
+  "Atur jam fokus kerja per hari dan masukkan deadline dari klien",
   "Baseline, Change Log, dan perbandingan Baseline vs Skenario",
-  "Buffer waktu lengkap dengan alasannya",
+  "Buffer waktu ekstra, beserta alasan kenapa buffer itu disarankan",
   "Health Score, Risiko, dan Insight",
   "Salin Ringkasan untuk klien dan kartu Bagikan",
 ];
@@ -72,10 +72,8 @@ export function UpgradeModal({
           <div>
             <h2 className="text-lg font-bold">ESTIMO Pro</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {formatMoney(PRO_PRICE_RUPIAH)} sekali bayar, selamanya.
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Bukan langganan. Tidak ada tagihan otomatis. Tidak ada kedaluwarsa.
+              {formatMoney(PRO_PRICE_RUPIAH)}, sekali bayar untuk selamanya — bukan langganan, tanpa
+              tagihan otomatis, dan tidak pernah kedaluwarsa.
             </p>
             {PRO_COMING_SOON && !isPro && (
               <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning-foreground">
@@ -115,12 +113,12 @@ export function UpgradeModal({
             </ul>
 
             {PRO_COMING_SOON ? (
-              <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
+              <div className="mt-5 rounded-xl border border-dashed border-primary/40 bg-accent/30 p-4">
                 <p className="text-sm font-semibold">ESTIMO Pro segera hadir</p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Pembayaran sedang disiapkan, jadi Pro belum bisa dibeli hari ini. Daftar minat
-                  lewat WhatsApp — admin akan mengabari lewat WhatsApp begitu Pro sudah bisa dibeli,
-                  lalu Anda bayar {formatMoney(PRO_PRICE_RUPIAH)} dan menerima kode unlock.
+                  lewat WhatsApp, dan Anda akan dikabari begitu Pro sudah bisa dibeli — tinggal
+                  bayar {formatMoney(PRO_PRICE_RUPIAH)} dan kode unlock dikirimkan.
                 </p>
 
                 <input
@@ -215,14 +213,14 @@ export function UpgradeModal({
         )}
 
         {!isPro && (
-          <div className="mt-5">
+          <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">
                 {PRO_COMING_SOON ? "Sudah dapat kode dari admin?" : "Sudah punya kode unlock?"}
               </span>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {PRO_COMING_SOON
-                  ? "Kolom ini untuk kode yang sudah diberikan admin langsung (misalnya untuk pengujian atau pengguna awal) — bukan untuk membeli."
+                  ? "Kolom ini untuk kode yang sudah diberikan langsung oleh admin, misalnya untuk pengujian atau pengguna awal."
                   : "Ganti perangkat atau install ulang? Masukkan kode yang sama lagi — Pro aktif lagi, tanpa bayar ulang."}
               </p>
               <div className="mt-1.5 flex gap-2">
@@ -232,7 +230,7 @@ export function UpgradeModal({
                     setCodeInput(e.target.value);
                     setError(null);
                   }}
-                  placeholder="PRO-20261026-AB12"
+                  placeholder="Masukkan kode unlock"
                   className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2.5 text-sm uppercase outline-none transition-shadow focus:ring-2 focus:ring-ring"
                 />
                 <button

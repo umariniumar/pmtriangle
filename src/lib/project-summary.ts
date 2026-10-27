@@ -27,10 +27,15 @@ const SCALE_LABELS: Record<ProjectScale, string> = {
   sangat_besar: "Sangat Besar",
 };
 
+// "besar" sengaja TIDAK memakai bg-warning/text-warning-foreground — warna
+// itu sudah dipakai badge "Segera Hadir" (status rilis Pro, arti berbeda
+// sama sekali). Skala proyek hanya informasi ukuran, bukan sinyal bahaya,
+// jadi dipindah ke warna netral (secondary) supaya tidak tertukar makna
+// dengan "Segera Hadir" di layar yang sama (lihat laporan desain, 27 Okt 2026).
 const SCALE_CHIP_CLASSES: Record<ProjectScale, string> = {
   ringan: "bg-success/12 text-success",
   menengah: "bg-primary/12 text-primary",
-  besar: "bg-warning/15 text-warning-foreground",
+  besar: "bg-secondary text-secondary-foreground",
   sangat_besar: "bg-destructive/12 text-destructive",
 };
 
@@ -43,21 +48,21 @@ export function classifyProjectScale(totalHours: number): ProjectScale {
 
 function pickRecommendation(scale: ProjectScale, workingDays: number): string {
   if (scale === "ringan") {
-    return "Masih realistis untuk dikerjakan oleh satu freelancer.";
+    return "Masih realistis untuk dikerjakan sendiri dalam waktu singkat.";
   }
 
   if (scale === "menengah") {
     if (workingDays <= 5) {
-      return "Cocok dikerjakan sendiri jika jadwal cukup longgar.";
+      return `Dengan estimasi ${workingDays} hari kerja, proyek ini cocok dikerjakan sendiri.`;
     }
-    return "Usahakan selesai per tahap agar progress mudah dipantau.";
+    return `Estimasi ${workingDays} hari kerja cukup panjang — bagi ke beberapa tahap agar progres mudah dipantau.`;
   }
 
   if (scale === "besar") {
-    return "Pertimbangkan membagi pekerjaan menjadi beberapa tahap.";
+    return `Estimasi ${workingDays} hari kerja ini sebaiknya dibagi menjadi beberapa tahap pengerjaan.`;
   }
 
-  return "Proyek sebaiknya dikerjakan lebih dari satu orang.";
+  return "Proyek sebesar ini sebaiknya dikerjakan lebih dari satu orang.";
 }
 
 function pickWatchOut(scale: ProjectScale, bufferHours: number, totalCost: number): string {
@@ -73,10 +78,10 @@ function pickWatchOut(scale: ProjectScale, bufferHours: number, totalCost: numbe
     return "Deadline ketat bisa membuat jadwal terasa mepet — siapkan rencana cadangan.";
   }
 
-  return "Sisihkan buffer waktu agar revisi tidak mengganggu jadwal.";
+  return `Sisihkan sekitar ${bufferHours} jam buffer waktu agar revisi tidak mengganggu jadwal.`;
 }
 
-function pickNextStep(scale: ProjectScale, totalCost: number): string {
+function pickNextStep(scale: ProjectScale, workingDays: number, totalCost: number): string {
   if (scale === "ringan") {
     if (totalCost >= COST_ATTENTION_THRESHOLD) {
       return "Sepakati harga, ruang lingkup, dan tenggat waktu secara tertulis sebelum mulai.";
@@ -85,7 +90,7 @@ function pickNextStep(scale: ProjectScale, totalCost: number): string {
   }
 
   if (scale === "menengah") {
-    return "Buat urutan pekerjaan per hari atau per minggu sebelum mulai.";
+    return `Bagi pengerjaan ke ${workingDays} hari kerja ke depan, per hari atau per minggu, sebelum mulai.`;
   }
 
   if (scale === "besar") {
@@ -104,7 +109,7 @@ export function buildProjectSummary(ctx: ProjectSummaryContext): ProjectSummary 
     scaleChipClass: SCALE_CHIP_CLASSES[scale],
     recommendation: pickRecommendation(scale, ctx.workingDays),
     watchOut: pickWatchOut(scale, ctx.bufferHours, ctx.totalCost),
-    nextStep: pickNextStep(scale, ctx.totalCost),
+    nextStep: pickNextStep(scale, ctx.workingDays, ctx.totalCost),
   };
 }
 
