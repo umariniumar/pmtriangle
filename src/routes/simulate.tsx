@@ -14,6 +14,8 @@ import {
   Share2,
   Copy,
   Lock,
+  AlertTriangle,
+  Compass,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -61,6 +63,19 @@ import { copyToClipboard } from "@/lib/share";
 import { buildShareCardData, shareCardFilename } from "@/lib/share-card-data";
 import { bagikanProyek } from "@/lib/share-card-engine";
 import { useProStatus } from "@/lib/pro";
+import {
+  allShownPlansFinal,
+  buildNegotiationPlans,
+  recommendedPlanKind,
+  type BudgetPlan,
+  type DeadlineAndBudgetPlan,
+  type DeadlinePlan,
+  type NegotiationItemInput,
+  type NegotiationPlans,
+  type NormalPlan,
+  type ScopeConflictWarning,
+} from "@/lib/negotiation";
+import { hasUsedNegotiationTrial, markNegotiationTrialUsed } from "@/lib/solver-trial";
 import { ShareCardExportPortal } from "@/components/share-card/share-card-export-portal";
 import { AnimatedNumber } from "@/components/animated-number";
 import { EstimoLogo } from "@/components/estimo-logo";
@@ -169,6 +184,36 @@ function describeItemChange(
 
 const PROJECT_NAME_PLACEHOLDER = "Contoh: Website Company Profile";
 
+// Default Cn sama dengan default lama (WORK_HOURS_PER_DAY simulator.ts),
+// supaya pengguna lama yang tidak mengisi Cn tidak melihat perubahan angka
+// di cabang nego (Bagian 4.1, 7.3).
+const DEFAULT_NORMAL_HOURS_PER_DAY = 8;
+
+// Bagian 6 — note panduan tarif, ditempatkan dekat input tarif lembur dan
+// jam normal per hari. Ditutup (collapsed) secara default supaya tidak
+// berulang mencolok kalau dipasang di tiap pekerjaan; isinya bukan
+// kalkulator — ESTIMO tetap memakai angka yang pengguna masukkan sendiri.
+function RateGuideNote() {
+  return (
+    <details className="mt-1.5 rounded-lg border border-dashed border-input p-2.5 text-xs text-muted-foreground open:bg-muted/30">
+      <summary className="cursor-pointer select-none font-medium text-foreground">
+        Cara menghitung tarif sebagai acuan
+      </summary>
+      <p className="mt-2 leading-relaxed">
+        Tarif normal per jam bisa dihitung dari upah sebulan dibagi 173. Contoh, kalau upah sebulan
+        Rp12.975.000, maka tarif per jamnya Rp75.000. Untuk lembur, acuan pemerintah adalah jam
+        lembur pertama 1,5 kali tarif normal, dan jam lembur berikutnya 2 kali tarif normal. Jadi
+        kalau tarif normal Rp75.000, acuan lemburnya adalah Rp112.500 untuk jam lembur pertama per
+        hari, dan Rp150.000 untuk jam lembur berikutnya per hari. Aturan ini sebenarnya untuk
+        karyawan, bukan kewajiban hukum untuk freelancer, tapi bisa dipakai sebagai patokan wajar
+        supaya tarif lembur tidak terlalu murah. Perhitungan di ESTIMO tetap mengikuti angka yang
+        Anda masukkan sendiri, bukan rumus ini secara otomatis. Acuan: PP Nomor 35 Tahun 2021, Pasal
+        31 dan Pasal 32, batas lembur maksimal 4 jam per hari dan 18 jam per minggu.
+      </p>
+    </details>
+  );
+}
+
 function SimulatePage() {
   const [projectName, setProjectName] = useState("");
   const [items, setItems] = useState<EstimateItem[]>([makeItem()]);
@@ -182,6 +227,13 @@ function SimulatePage() {
   const [showResult, setShowResult] = useState(false);
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  // Cabang Nego (Bagian 4-5) — Cn, Bc, dan Ro per pekerjaan. Dc memakai
+  // deadlineDays yang sudah ada (Bagian 4.3), tidak diduplikasi.
+  const [normalHoursPerDay, setNormalHoursPerDay] = useState(DEFAULT_NORMAL_HOURS_PER_DAY);
+  const [budgetRupiah, setBudgetRupiah] = useState<number | undefined>(undefined);
+  const [overtimeRates, setOvertimeRates] = useState<Record<string, number | undefined>>({});
+  const [negotiationRevealed, setNegotiationRevealed] = useState(false);
+  const [negotiationTrialUsed, setNegotiationTrialUsed] = useState(() => hasUsedNegotiationTrial());
   const resultRef = useRef<HTMLDivElement>(null);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const simulationCompletedRef = useRef(false);
@@ -212,6 +264,8 @@ function SimulatePage() {
     [items, isPro],
   );
   const effectiveFocusHoursPerDay = isPro ? focusHoursPerDay : DEFAULT_FOCUS_HOURS_PER_DAY;
+  // Dipakai HANYA untuk hasil dasar (simulate() di bawah) dan kartu "Durasi
+  // vs deadline" yang Pro-only — tetap terkunci seperti sebelumnya.
   const effectiveDeadlineDays = isPro ? deadlineDays : undefined;
 
   // Kalkulasi langsung — diperbarui pada setiap ketikan, tanpa menunggu tombol.
@@ -222,6 +276,41 @@ function SimulatePage() {
         deadlineDays: effectiveDeadlineDays,
       }),
     [effectiveItems, effectiveFocusHoursPerDay, effectiveDeadlineDays],
+  );
+
+  // Cabang Nego dibangun dari Hj (adjustedHours) dan Rnj (rate) yang sudah
+  // dihitung simulate() di atas, plus Ro (tarif lembur) yang baru — TIDAK
+  // menyentuh atau menyatukan dengan `result` itu sendiri (Bagian 3).
+  const negotiationItems = useMemo<NegotiationItemInput[]>(
+    () =>
+      result.items
+        .filter((item) => item.baseHours > 0)
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          adjustedHours: item.adjustedHours,
+          normalRate: item.rate,
+          overtimeRate: overtimeRates[item.id],
+        })),
+    [result.items, overtimeRates],
+  );
+
+  // Cn, Dc, dan Bc untuk Cabang Nego SENGAJA tidak dikunci ke status Pro di
+  // sini (beda dari effectiveDeadlineDays di atas) — field-nya sendiri sudah
+  // bisa diisi Free di kartu "Permintaan Klien", supaya percobaan gratis 1x
+  // benar-benar bisa mencapai Cabang 2-5, bukan cuma Cabang 1. Yang mengunci
+  // Pro di sini adalah HASIL cabang nego (lihat NegotiationSection/trial di
+  // bawah), bukan datanya.
+  const negotiationPlans = useMemo<NegotiationPlans>(
+    () =>
+      buildNegotiationPlans({
+        items: negotiationItems,
+        normalHoursPerDay,
+        deadlineDays,
+        budgetRupiah,
+        flexibleDimension,
+      }),
+    [negotiationItems, normalHoursPerDay, deadlineDays, budgetRupiah, flexibleDimension],
   );
 
   const rigidDimensionLabel = useMemo(
@@ -326,8 +415,12 @@ function SimulatePage() {
     setFocusHoursPerDay(value);
   };
 
+  // Deadline sekarang bisa diisi Free juga (dipakai Cabang Nego) — tidak ada
+  // lagi guard isPro di sini. Perubahan tetap hanya tercatat di Change Log
+  // kalau baseline sudah dikunci, dan baseline itu sendiri tetap Pro-only
+  // (handleLockBaseline masih menolak Free), jadi cabang `if (baseline)` di
+  // bawah ini tidak pernah jalan untuk Free.
   const handleDeadlineChange = (value: number | undefined) => {
-    if (!isPro) return;
     if (baseline) {
       const afterResult = simulate(items, { focusHoursPerDay, deadlineDays: value });
       const beforeLabel = deadlineDays ? `${deadlineDays} hari` : "tidak ada";
@@ -368,11 +461,26 @@ function SimulatePage() {
     if (!canSimulate) return;
     trackSimulationStarted(simulationMeta);
     setShowResult(true);
+    // Simulasi baru me-reset gerbang cabang nego (Bagian 5.6) — status
+    // percobaan Free sendiri (negotiationTrialUsed) TIDAK ikut direset di
+    // sini, hanya dibaca ulang dari localStorage, karena itu flag permanen.
+    setNegotiationRevealed(false);
     simulationCompletedRef.current = true;
     trackSimulationCompleted(simulationMeta);
     requestAnimationFrame(() =>
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
+  };
+
+  // Bagian 5.6 — percobaan Free terpakai hanya kalau cabang yang tampil
+  // benar-benar final (bukan menunggu Ro, bukan karena Dc/Bc kosong).
+  const handleRevealNegotiation = () => {
+    if (!isPro && negotiationTrialUsed) return;
+    setNegotiationRevealed(true);
+    if (!isPro && allShownPlansFinal(negotiationPlans)) {
+      markNegotiationTrialUsed();
+      setNegotiationTrialUsed(true);
+    }
   };
 
   const shareCardData = useMemo(
@@ -486,6 +594,10 @@ function SimulatePage() {
     setBaseline(null);
     setChangeLog([]);
     setShowResult(false);
+    setNormalHoursPerDay(DEFAULT_NORMAL_HOURS_PER_DAY);
+    setBudgetRupiah(undefined);
+    setOvertimeRates({});
+    setNegotiationRevealed(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -573,7 +685,10 @@ function SimulatePage() {
           </p>
         </section>
 
-        {/* Pengaturan simulasi — dimensi fleksibel, jam fokus, dan deadline opsional (Pro) */}
+        {/* Pengaturan simulasi — dimensi fleksibel dan jam fokus (Pro). Deadline,
+            jam normal per hari, dan budget klien TIDAK di sini lagi — dipindah
+            ke kartu "Permintaan Klien" di bawah, yang tersedia untuk semua
+            pengguna karena dipakai Cabang Nego (termasuk percobaan Free). */}
         {isPro ? (
           <section className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
             <h2 className="text-sm font-semibold">Pengaturan Simulasi</h2>
@@ -625,41 +740,13 @@ function SimulatePage() {
                 Bagaimana jika Anda hanya fokus {focusHoursPerDay} jam/hari?
               </p>
             </div>
-
-            <label className="mt-4 block">
-              <span className="text-xs font-medium text-muted-foreground">
-                Deadline klien (opsional, hari kerja)
-              </span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                inputMode="numeric"
-                value={deadlineDays ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw.trim() === "") {
-                    handleDeadlineChange(undefined);
-                    return;
-                  }
-                  const n = Number(raw);
-                  // Deadline hanya bermakna sebagai hari kerja BULAT — pecahan
-                  // dibulatkan ke hari terdekat, dan nilai yang sudah
-                  // dibulatkan ditampilkan kembali di input (tidak ada nilai
-                  // pecahan yang tersimpan diam-diam).
-                  handleDeadlineChange(Number.isFinite(n) && n > 0 ? Math.round(n) : undefined);
-                }}
-                placeholder="Misal 5"
-                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
-              />
-            </label>
           </section>
         ) : (
           <section className="mt-4 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card sm:p-6">
             <h2 className="text-sm font-semibold">Pengaturan Simulasi — Pro</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pilih sisi yang fleksibel antara Scope, Waktu, atau Biaya, atur jam fokus kerja per
-              hari, dan masukkan deadline dari klien — semua tersedia di ESTIMO Pro.
+              Pilih sisi yang fleksibel antara Scope, Waktu, atau Biaya, dan atur jam fokus kerja
+              per hari — tersedia di ESTIMO Pro.
             </p>
             <button
               type="button"
@@ -670,6 +757,98 @@ function SimulatePage() {
             </button>
           </section>
         )}
+
+        {/* Permintaan Klien — dipakai Cabang Nego. SENGAJA tidak Pro-gated:
+            kalau Dc/Cn/Bc hanya ada di kartu Pro-only, Free tidak pernah bisa
+            mencapai Cabang 2-5, dan percobaan gratis 1x jadi tidak berguna
+            (hanya pernah menampilkan Cabang 1). Hasil cabang nego sendiri
+            tetap dikunci oleh trial/Pro di bagian hasil. */}
+        <section className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6">
+          <h2 className="text-sm font-semibold">Permintaan Klien</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Dipakai Cabang Nego di bawah hasil — tidak memengaruhi hasil dasar di atas.
+          </p>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-muted-foreground">
+              Deadline klien (opsional, hari kerja)
+            </span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              value={deadlineDays ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw.trim() === "") {
+                  handleDeadlineChange(undefined);
+                  return;
+                }
+                const n = Number(raw);
+                // Deadline hanya bermakna sebagai hari kerja BULAT — pecahan
+                // dibulatkan ke hari terdekat, dan nilai yang sudah
+                // dibulatkan ditampilkan kembali di input (tidak ada nilai
+                // pecahan yang tersimpan diam-diam).
+                handleDeadlineChange(Number.isFinite(n) && n > 0 ? Math.round(n) : undefined);
+              }}
+              placeholder="Misal 5"
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+            />
+          </label>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-muted-foreground">
+              Jam normal per hari untuk proyek ini
+            </span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              value={normalHoursPerDay}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setNormalHoursPerDay(
+                  Number.isFinite(n) && n > 0 ? Math.round(n) : DEFAULT_NORMAL_HOURS_PER_DAY,
+                );
+              }}
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Jam kerja normal sebelum dihitung lembur. Kalau total jam per hari melebihi angka ini,
+              selisihnya dihitung lembur.
+            </p>
+            <RateGuideNote />
+          </label>
+
+          <label className="mt-4 block">
+            <span className="text-xs font-medium text-muted-foreground">
+              Budget klien (opsional)
+            </span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={budgetRupiah ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw.trim() === "") {
+                  setBudgetRupiah(undefined);
+                  return;
+                }
+                const n = Number(raw);
+                setBudgetRupiah(Number.isFinite(n) && n > 0 ? n : undefined);
+              }}
+              placeholder="Misal 1500000"
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+            />
+            {budgetRupiah !== undefined && budgetRupiah > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">{formatMoney(budgetRupiah)}</p>
+            )}
+          </label>
+        </section>
 
         {/* Daftar pekerjaan */}
         <section className="mt-4">
@@ -759,6 +938,38 @@ function SimulatePage() {
                       )}
                     </label>
                   </div>
+
+                  <label className="mt-3 block">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Tarif Lembur per Jam
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={overtimeRates[item.id] ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setOvertimeRates((prev) => ({
+                          ...prev,
+                          [item.id]: raw.trim() === "" ? undefined : parseNonNegative(raw),
+                        }));
+                      }}
+                      placeholder="Belum diisi"
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-base outline-none transition-shadow placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-ring"
+                    />
+                    {overtimeRates[item.id] !== undefined &&
+                      (overtimeRates[item.id] as number) > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatMoney(overtimeRates[item.id] as number)}
+                        </p>
+                      )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Dipakai di Cabang Nego saat jam kerja pekerjaan ini melebihi jam normal per
+                      hari. Boleh dikosongkan dulu.
+                    </p>
+                    <RateGuideNote />
+                  </label>
 
                   {isPro ? (
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -883,6 +1094,11 @@ function SimulatePage() {
               onResetBaseline={handleResetBaseline}
               isPro={isPro}
               onOpenUpgrade={openUpgradeModal}
+              negotiationPlans={negotiationPlans}
+              normalHoursPerDay={normalHoursPerDay}
+              negotiationRevealed={negotiationRevealed}
+              negotiationTrialUsed={negotiationTrialUsed}
+              onRevealNegotiation={handleRevealNegotiation}
             />
           </div>
         )}
@@ -996,6 +1212,11 @@ function Results({
   onResetBaseline,
   isPro,
   onOpenUpgrade,
+  negotiationPlans,
+  normalHoursPerDay,
+  negotiationRevealed,
+  negotiationTrialUsed,
+  onRevealNegotiation,
 }: {
   projectName: string;
   result: ReturnType<typeof simulate>;
@@ -1010,6 +1231,11 @@ function Results({
   onResetBaseline: () => void;
   isPro: boolean;
   onOpenUpgrade: () => void;
+  negotiationPlans: NegotiationPlans;
+  normalHoursPerDay: number;
+  negotiationRevealed: boolean;
+  negotiationTrialUsed: boolean;
+  onRevealNegotiation: () => void;
 }) {
   const hasDeadline = typeof deadlineDays === "number" && deadlineDays > 0;
   const isOverDeadline = hasDeadline && result.workingDays > deadlineDays;
@@ -1262,6 +1488,17 @@ function Results({
         riskLabel={isPro ? RISK_LABELS[result.riskLevel] : undefined}
         insight={isPro ? result.insight : undefined}
       />
+
+      <NegotiationSection
+        plans={negotiationPlans}
+        normalHoursPerDay={normalHoursPerDay}
+        flexibleDimension={flexibleDimension}
+        isPro={isPro}
+        revealed={negotiationRevealed}
+        trialUsed={negotiationTrialUsed}
+        onReveal={onRevealNegotiation}
+        onOpenUpgrade={onOpenUpgrade}
+      />
     </div>
   );
 }
@@ -1312,6 +1549,346 @@ function StatCard({
       </div>
       <p className="mt-2 font-display text-2xl font-bold tracking-tight">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+// Cabang Nego — Bagian 5. Bagian BARU di bawah hasil yang sudah ada, dengan
+// hitungannya sendiri (negotiation.ts), tidak disatukan dengan `result`.
+function NegotiationSection({
+  plans,
+  normalHoursPerDay,
+  flexibleDimension,
+  isPro,
+  revealed,
+  trialUsed,
+  onReveal,
+  onOpenUpgrade,
+}: {
+  plans: NegotiationPlans;
+  normalHoursPerDay: number;
+  flexibleDimension: FlexibleDimension;
+  isPro: boolean;
+  revealed: boolean;
+  trialUsed: boolean;
+  onReveal: () => void;
+  onOpenUpgrade: () => void;
+}) {
+  const recommended = recommendedPlanKind(flexibleDimension);
+
+  if (!revealed) {
+    if (!isPro && trialUsed) {
+      return (
+        <div className="mt-3 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card">
+          <p className="text-sm font-semibold">Cabang Nego — Pro</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Percobaan gratis Cabang Nego sudah dipakai di perangkat ini. Upgrade ke ESTIMO Pro untuk
+            memakainya tanpa batas.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenUpgrade}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            Upgrade ke Pro
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={
+          isPro
+            ? "mt-3 rounded-2xl border border-border bg-card p-5 text-center shadow-card"
+            : "mt-3 rounded-2xl border border-dashed border-primary/40 bg-accent/30 p-5 text-center shadow-card"
+        }
+      >
+        <div className="flex items-center justify-center gap-1.5">
+          <Compass className="h-4 w-4 text-primary" />
+          <p className="text-sm font-semibold">Cabang Nego — Scope, Waktu, dan Biaya</p>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Lihat beberapa rencana negosiasi — kejar deadline, patuhi budget, atau kombinasi keduanya
+          — berdasarkan jam normal per hari dan tarif lembur yang Anda masukkan.
+        </p>
+        {!isPro && (
+          <p className="mt-2 text-xs font-semibold text-primary">
+            Ini percobaan gratis 1× untuk cabang nego. Setelah ini, cabang nego hanya untuk Pro.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={onReveal}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
+        >
+          Lihat Cabang Nego
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Cabang Nego
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Hasil di atas memakai jam fokus per hari dari slider. Cabang di bawah ini memakai jam
+          normal per hari yang Anda masukkan untuk proyek ini ({normalHoursPerDay} jam/hari), dan
+          dihitung terpisah — bukan digabung dengan angka di atas.
+        </p>
+      </div>
+
+      <NormalPlanCard plan={plans.normal} highlighted={recommended === "normal"} />
+
+      {plans.deadline && (
+        <DeadlinePlanCard plan={plans.deadline} highlighted={recommended === "deadline"} />
+      )}
+
+      {plans.budget && <BudgetPlanCard plan={plans.budget} />}
+
+      {plans.deadlineAndBudget && (
+        <DeadlineAndBudgetPlanCard
+          plan={plans.deadlineAndBudget}
+          highlighted={recommended === "deadlineAndBudget"}
+        />
+      )}
+
+      {plans.conflictWarning && <ConflictWarningCard warning={plans.conflictWarning} />}
+    </div>
+  );
+}
+
+function QualityBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-success/12 px-2 py-0.5 text-[11px] font-semibold text-success">
+      Excellent
+    </span>
+  );
+}
+
+function RecommendedBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
+      Direkomendasikan untuk pilihan fleksibel Anda
+    </span>
+  );
+}
+
+// Reuse pola "belum tersedia" yang sudah ada (upgrade-modal.tsx) — netral,
+// bukan warna warning yang sudah dipakai badge "Segera Hadir".
+function PendingOvertimeNote() {
+  return (
+    <p className="mt-2 rounded-lg border border-dashed border-input p-2.5 text-xs text-muted-foreground">
+      Belum bisa dihitung final — isi tarif lembur dulu.
+    </p>
+  );
+}
+
+function NormalPlanCard({ plan, highlighted }: { plan: NormalPlan; highlighted: boolean }) {
+  return (
+    <div
+      className={`rounded-2xl border p-5 shadow-card ${
+        highlighted ? "border-primary/40 bg-accent/20" : "border-border bg-card"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Rencana Normal</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <QualityBadge />
+          {highlighted && <RecommendedBadge />}
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Scope penuh, tanpa lembur, jadwal paling longgar.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">Hari</p>
+          <p className="mt-1 font-display text-lg font-bold tracking-tight">{plan.days} Hari</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Biaya</p>
+          <p className="mt-1 font-display text-lg font-bold tracking-tight">
+            {formatMoney(plan.cost)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeadlinePlanCard({ plan, highlighted }: { plan: DeadlinePlan; highlighted: boolean }) {
+  const pending = plan.split.totalCost === null;
+  return (
+    <div
+      className={`rounded-2xl border p-5 shadow-card ${
+        highlighted ? "border-primary/40 bg-accent/20" : "border-border bg-card"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Kejar Deadline</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <QualityBadge />
+          {highlighted && <RecommendedBadge />}
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Scope penuh selesai dalam {plan.days} Hari — butuh{" "}
+        {formatHoursLabel(plan.hoursPerDayNeeded)} per hari.
+      </p>
+      {pending ? (
+        <PendingOvertimeNote />
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Jam normal / lembur</p>
+              <p className="mt-1 text-sm font-semibold">
+                {formatHoursLabel(plan.split.normalHoursUsed)} /{" "}
+                {formatHoursLabel(plan.split.overtimeHoursTotal)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Biaya total</p>
+              <p className="mt-1 font-display text-lg font-bold tracking-tight">
+                {formatMoney(plan.split.totalCost ?? 0)}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Premi kecepatan {formatMoney(plan.speedPremium ?? 0)} dibanding Rencana Normal.
+          </p>
+          {plan.budgetShortfall !== null && (
+            <p
+              className={`mt-1 text-xs font-medium ${
+                plan.budgetShortfall > 0 ? "text-destructive" : "text-muted-foreground"
+              }`}
+            >
+              {plan.budgetShortfall > 0
+                ? `Kekurangan ${formatMoney(plan.budgetShortfall)} dari budget klien.`
+                : "Masih sesuai budget klien."}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BudgetPlanCard({ plan }: { plan: BudgetPlan }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Patuhi Budget</p>
+        <QualityBadge />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {plan.fullScopeFits
+          ? "Scope penuh masih muat di budget klien, tanpa lembur."
+          : `Scope dipangkas jadi ${formatHoursLabel(plan.scopeMaxHours)} supaya muat di budget klien, tanpa lembur.`}
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">Hari</p>
+          <p className="mt-1 font-display text-lg font-bold tracking-tight">{plan.days} Hari</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Biaya</p>
+          <p className="mt-1 font-display text-lg font-bold tracking-tight">
+            {formatMoney(plan.cost)}
+          </p>
+        </div>
+      </div>
+      {!plan.fullScopeFits && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Potongan {formatHoursLabel(plan.scopeCutHours)} — berarti ada pekerjaan, konsep, variasi,
+          atau revisi yang perlu dikurangi. Anda yang menentukan bagian mana di daftar pekerjaan.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DeadlineAndBudgetPlanCard({
+  plan,
+  highlighted,
+}: {
+  plan: DeadlineAndBudgetPlan;
+  highlighted: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-5 shadow-card ${
+        highlighted ? "border-primary/40 bg-accent/20" : "border-border bg-card"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">Patuhi Deadline dan Budget</p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!plan.pending && <QualityBadge />}
+          {highlighted && <RecommendedBadge />}
+        </div>
+      </div>
+      {plan.pending ? (
+        <>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Selesai dalam {plan.days} Hari, sesuai budget klien.
+          </p>
+          <PendingOvertimeNote />
+        </>
+      ) : (
+        <>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {plan.fullScopeFits
+              ? "Scope penuh muat dalam deadline dan budget klien."
+              : `Scope dipangkas jadi ${formatHoursLabel(plan.scopeMaxHours ?? 0)} (potongan ${Math.round(plan.scopeCutPercent ?? 0)} persen) supaya muat dalam deadline dan budget klien.`}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Hari</p>
+              <p className="mt-1 font-display text-lg font-bold tracking-tight">{plan.days} Hari</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Biaya</p>
+              <p className="mt-1 font-display text-lg font-bold tracking-tight">
+                {formatMoney(plan.cost ?? 0)}
+              </p>
+            </div>
+          </div>
+          {!plan.fullScopeFits && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Potongan {formatHoursLabel(plan.scopeCutHours ?? 0)} (
+              {Math.round(plan.scopeCutPercent ?? 0)} persen) — berarti ada pekerjaan, konsep,
+              variasi, atau revisi yang perlu dikurangi. Anda yang menentukan bagian mana di daftar
+              pekerjaan.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ConflictWarningCard({ warning }: { warning: ScopeConflictWarning }) {
+  return (
+    <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-5">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-destructive" />
+        <p className="text-sm font-semibold text-destructive">
+          Scope, Deadline, dan Budget Tidak Muat Bersamaan
+        </p>
+      </div>
+      <p className="mt-2 text-xs text-destructive/80">
+        Scope penuh ({formatHoursLabel(warning.fullScopeHours)}), deadline {warning.deadlineDays}{" "}
+        hari, dan budget {formatMoney(warning.budgetRupiah)} tidak bisa dipenuhi sekaligus.
+        {warning.deadlineCost !== null &&
+          ` Menyelesaikan semuanya dalam ${warning.deadlineDays} hari butuh ${formatMoney(warning.deadlineCost)}.`}{" "}
+        Kalau dipaksakan, revisi maksimal dan kualitas excellent tidak bisa dipertahankan — detail
+        pekerjaan harus dikurangi, dan risiko ini perlu disampaikan ke klien dengan jujur.
+      </p>
     </div>
   );
 }
